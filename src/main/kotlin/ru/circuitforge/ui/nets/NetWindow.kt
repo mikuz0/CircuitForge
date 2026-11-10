@@ -2,7 +2,7 @@ package ru.circuitforge.ui.nets
 
 import javafx.stage.Stage
 import ru.circuitforge.ui.common.ProjectAware
-import ru.circuitforge.project.Project
+import java.nio.file.Path
 
 /**
  * Заглушка окна редактора сетей.
@@ -16,6 +16,6 @@ class NetWindow : ProjectAware {
     }
 
     override fun showWindow() = stage.show()
-    override fun openProject(project: Project) {}
+    override fun openProject(projectPath: Path) {}
     override fun getStage(): Stage = stage
 }

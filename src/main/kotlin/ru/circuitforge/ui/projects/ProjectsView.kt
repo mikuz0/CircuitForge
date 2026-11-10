@@ -2,27 +2,116 @@ package ru.circuitforge.ui.projects
 
 import javafx.geometry.Insets
 import javafx.geometry.Pos
-import javafx.scene.control.Button
-import javafx.scene.control.ListView
-import javafx.scene.layout.VBox
+import javafx.scene.Scene
+import javafx.scene.control.*
+import javafx.scene.layout.*
 import ru.circuitforge.project.ProjectInfo
 
 /**
- * Представление списка проектов с кнопками действий.
- * Отображает проекты в ListView с кнопками "Open", "New", "Delete".
+ * Представление Менеджера проектов.
+ * Содержит выбор рабочей области, список проектов, поле создания нового проекта и кнопки модулей.
  */
 class ProjectsView {
-    private val listView = ListView<ProjectInfo>()
-    private val openButton = Button("Open")
-    private val newButton = Button("New")
-    private val deleteButton = Button("Delete")
+    // Workspace секция
+    private val workspacePathField = TextField().apply { isEditable = false }
+    private val chooseWorkspaceBtn = Button("Choose workspace...")
 
-    val root: VBox = VBox(10.0, listView, openButton, newButton, deleteButton).apply {
-        padding = Insets(10.0)
-        alignment = Pos.TOP_LEFT
+    // New project секция
+    private val newProjectNameField = TextField()
+    private val createProjectBtn = Button("Create")
+
+    // Статус/ошибки
+    private val statusLabel = Label()
+
+    // Список проектов
+    private val listView = ListView<ProjectInfo>().apply {
+        prefHeight = 200.0
     }
 
-    /** Устанавливает список проектов для отображения. */
+    // Кнопки модулей
+    private val bomBtn = Button("ПЭ3")
+    private val netsBtn = Button("Связи")
+    private val componentsBtn = Button("Компоненты")
+
+    // Callback-свойства
+    var onChooseWorkspace: (() -> Unit)? = null
+    var onCreateProject: (() -> Unit)? = null
+    var onBomClick: (() -> Unit)? = null
+    var onNetsClick: (() -> Unit)? = null
+    var onComponentsClick: (() -> Unit)? = null
+
+    private val root = VBox(10.0).apply {
+        padding = Insets(15.0)
+        alignment = Pos.TOP_LEFT
+        style = "-fx-background-color: #fafafa;"
+
+        // Workspace секция
+        val workspaceSection = VBox(5.0,
+            Label("Workspace:"),
+            HBox(10.0, workspacePathField, chooseWorkspaceBtn).apply {
+                alignment = Pos.CENTER_LEFT
+                HBox.setHgrow(workspacePathField, Priority.ALWAYS)
+            }
+        ).apply {
+            padding = Insets(5.0)
+            style = "-fx-background-color: #e8e8e8; -fx-padding: 5; -fx-border-radius: 3;"
+        }
+
+        // New project секция
+        val newProjectSection = VBox(5.0,
+            Label("New project:"),
+            HBox(10.0, newProjectNameField, createProjectBtn).apply {
+                alignment = Pos.CENTER_LEFT
+                HBox.setHgrow(newProjectNameField, Priority.ALWAYS)
+            }
+        ).apply {
+            padding = Insets(5.0)
+            style = "-fx-background-color: #e8e8e8; -fx-padding: 5; -fx-border-radius: 3;"
+        }
+
+        // Статус
+        statusLabel.apply {
+            style = "-fx-text-fill: red; -fx-font-size: 12;"
+        }
+
+        // Список проектов
+        val listSection = VBox(5.0, Label("Projects:"), listView).apply {
+            VBox.setVgrow(listView, Priority.ALWAYS)
+            padding = Insets(5.0)
+            style = "-fx-background-color: white; -fx-border-color: #ccc; -fx-border-width: 1; -fx-border-radius: 3;"
+        }
+
+        // Кнопки модулей
+        val moduleButtons = HBox(10.0, bomBtn, netsBtn, componentsBtn).apply {
+            alignment = Pos.CENTER_LEFT
+            padding = Insets(5.0)
+            style = "-fx-background-color: #f0f0f0; -fx-padding: 5;"
+        }
+        setModuleButtonsEnabled(false)
+
+        children.addAll(workspaceSection, newProjectSection, statusLabel, listSection, moduleButtons)
+    }
+
+    /** Строит сцену. */
+    fun buildScene(): Scene {
+        return Scene(root, 700.0, 500.0)
+    }
+
+    /** Устанавливает контроллер и подписывает кнопки. */
+    fun setController(controller: ProjectsController) {
+        chooseWorkspaceBtn.setOnAction { onChooseWorkspace?.invoke() }
+        createProjectBtn.setOnAction { onCreateProject?.invoke() }
+        bomBtn.setOnAction { onBomClick?.invoke() }
+        netsBtn.setOnAction { onNetsClick?.invoke() }
+        componentsBtn.setOnAction { onComponentsClick?.invoke() }
+
+        // Слушатель изменения выделения — обновляет состояние кнопок модулей
+        listView.selectionModel.selectedItemProperty().addListener { _, _, _ ->
+            controller.updateModuleButtonsState()
+        }
+    }
+
+    /** Устанавливает список проектов. */
     fun setProjects(projects: List<ProjectInfo>) {
         listView.items.setAll(projects)
     }
@@ -30,18 +119,42 @@ class ProjectsView {
     /** Возвращает выбранный проект. */
     fun selectedProject(): ProjectInfo? = listView.selectionModel.selectedItem
 
-    /** Подписывается на событие открытия проекта. */
-    fun onOpen(action: () -> Unit) {
-        openButton.setOnAction { action() }
+    /** Выделяет проект по имени в списке. */
+    fun selectProjectByName(name: String) {
+        listView.items.find { it.name == name }
+            ?.let { listView.selectionModel.select(it) }
     }
 
-    /** Подписывается на событие создания проекта. */
-    fun onNew(action: () -> Unit) {
-        newButton.setOnAction { action() }
+    /** Возвращает путь рабочей области. */
+    fun workspacePath(): String = workspacePathField.text
+
+    /** Устанавливает путь рабочей области. */
+    fun setWorkspacePath(path: String) {
+        workspacePathField.text = path
     }
 
-    /** Подписывается на событие удаления проекта. */
-    fun onDelete(action: () -> Unit) {
-        deleteButton.setOnAction { action() }
+    /** Устанавливает имя нового проекта. */
+    fun newProjectName(): String = newProjectNameField.text
+
+    /** Очищает поле нового проекта. */
+    fun clearNewProjectName() {
+        newProjectNameField.clear()
+    }
+
+    /** Устанавливает текст статуса (ошибки). */
+    fun setStatus(text: String, isError: Boolean = false) {
+        statusLabel.text = text
+        statusLabel.style = if (isError) {
+            "-fx-text-fill: red; -fx-font-size: 12;"
+        } else {
+            "-fx-text-fill: green; -fx-font-size: 12;"
+        }
+    }
+
+    /** Включает/выключает кнопки модулей. */
+    fun setModuleButtonsEnabled(enabled: Boolean) {
+        bomBtn.isDisable = !enabled
+        netsBtn.isDisable = !enabled
+        componentsBtn.isDisable = !enabled
     }
 }

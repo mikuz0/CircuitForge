@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.time.attribute.BasicFileAttributes
 
 /**
  * Репозиторий для управления проектами.
@@ -21,15 +20,41 @@ object ProjectRepository {
         ignoreUnknownKeys = true
     }
 
-    /** Создаёт новый проект с указанным именем и путём. */
-    fun create(name: String, path: Path): Path {
+    /**
+     * Создаёт новый проект в рабочей области.
+     * @param name имя проекта (безопасное, без / и \)
+     * @param workspace рабочая область (папка, где создаётся проект)
+     * @return путь к файлу project.cfproj
+     * @throws IllegalArgumentException если имя недопустимо или проект уже существует
+     */
+    @Throws(IllegalArgumentException::class)
+    fun create(name: String, workspace: Path): Path {
+        // Валидация имени
+        if (name.isBlank()) {
+            throw IllegalArgumentException("Project name cannot be blank")
+        }
+        if ('/' in name || '\\' in name) {
+            throw IllegalArgumentException("Project name cannot contain '/' or '\\'")
+        }
+
+        val projectDir = workspace.resolve(name)
+        if (Files.exists(projectDir)) {
+            throw IllegalArgumentException("Project '$name' already exists at $projectDir")
+        }
+
+        // Создаём полную структуру папок
+        Files.createDirectories(projectDir)
+        Files.createDirectories(projectDir.resolve("components"))
+        Files.createDirectories(projectDir.resolve("nets"))
+        Files.createDirectories(projectDir.resolve("exports"))
+
+        // Создаём файл проекта
+        val projectFile = projectDir.resolve(PROJECT_FILE_NAME)
         val project = Project(name = name)
-        val dir = path.resolve(name)
-        Files.createDirectories(dir)
-        val file = dir.resolve(PROJECT_FILE_NAME)
-        save(file, project)
-        logger.info("Project created: $file")
-        return file
+        save(projectFile, project)
+
+        logger.info("Project created: $projectFile")
+        return projectFile
     }
 
     /** Сохраняет проект в указанный файл. */
@@ -56,20 +81,22 @@ object ProjectRepository {
         }
     }
 
-    /** Сканирует директорию на наличие файлов проектов. */
+    /**
+     * Сканирует директорию на наличие файлов проектов.
+     * Возвращает список ProjectInfo, отсортированный по имени.
+     */
     fun scan(directory: Path): List<ProjectInfo> {
         val projects = mutableListOf<ProjectInfo>()
         try {
             Files.list(directory).use { stream ->
-                stream.filter { it.isDirectory() }
+                stream.filter { Files.isDirectory(it) }
                     .forEach { dir ->
                         val projectFile = dir.resolve(PROJECT_FILE_NAME)
                         if (Files.exists(projectFile)) {
                             try {
-                                val attr = Files.readAttributes(dir, BasicFileAttributes::class.java)
                                 projects.add(ProjectInfo(dir.fileName.toString(), dir))
                             } catch (e: Exception) {
-                                logger.warn("Failed to load project from $dir", e)
+                                logger.warn("Failed to load project from $dir, skipping", e)
                             }
                         }
                     }

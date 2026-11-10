@@ -5,6 +5,9 @@ import ru.circuitforge.ui.common.ModuleLauncher
 /**
  * Standalone launch для редактора сетей.
  */
-class NetApp : ModuleLauncher() {
-    override fun createWindow() = NetWindow().apply { showWindow() }.getStage()
+object NetApp {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        ModuleLauncher.run<NetWindow>({ NetWindow() }, args)
+    }
 }

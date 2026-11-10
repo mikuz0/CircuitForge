@@ -1,7 +1,7 @@
 package ru.circuitforge.ui.common
 
 import javafx.stage.Stage
-import ru.circuitforge.project.Project
+import java.nio.file.Path
 
 /**
  * Интерфейс для модулей, работающих с проектами.
@@ -11,8 +11,8 @@ interface ProjectAware {
     /** Показывает окно модуля. */
     fun showWindow()
 
-    /** Устанавливает текущий проект для модуля. */
-    fun openProject(project: Project)
+    /** Открывает проект по пути. */
+    fun openProject(projectPath: Path)
 
     /** Возвращает stage (окно) для модальных диалогов. */
     fun getStage(): Stage
