@@ -15,6 +15,10 @@ repositories {
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.slf4j:slf4j-simple:2.0.16")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
 }
 
 java {
@@ -143,4 +147,8 @@ tasks.named("distTar") {
 
 tasks.named("distZip") {
     dependsOn("generateExtraScripts")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
