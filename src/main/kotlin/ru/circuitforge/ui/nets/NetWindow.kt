@@ -33,6 +33,7 @@ class NetWindow : ProjectAware {
 
     // Данные
     private val nets = FXCollections.observableArrayList<Net>()
+    private val netNames = FXCollections.observableArrayList<String>()
     private var savedSnapshot: String = ""
 
     // UI — Toolbar
@@ -42,7 +43,7 @@ class NetWindow : ProjectAware {
     private val projectLabel = Label("Project: <not opened>")
 
     // UI — Список связей (Tab 1)
-    private val netListView = ListView<Net>()
+    private val netListView = ListView<String>()
     private val connectionsLabel = Label()
     private val connectionsTable = TableView<NetConnection>()
     private val connectionsList = FXCollections.observableArrayList<NetConnection>()
@@ -65,6 +66,14 @@ class NetWindow : ProjectAware {
         setupConnectionTable()
         setupToolbar()
         stage.scene = Scene(createRoot(), 1100.0, 700.0)
+        
+        // Защита от потери данных при закрытии
+        stage.setOnCloseRequest { event ->
+            if (isDirty()) {
+                event.consume()
+                showCloseConfirmation()
+            }
+        }
     }
 
     private fun createRoot(): BorderPane {
@@ -103,6 +112,7 @@ class NetWindow : ProjectAware {
             minWidth = 200.0
             style = "-fx-background-color: white; -fx-border-color: #ddd; -fx-border-width: 0 1 0 0;"
         }
+        netListView.items = netNames
 
         val rightPanel = VBox(10.0, connectionsLabel, connectionsTable,
             HBox(10.0, addConnectionButton, deleteConnectionButton).apply { alignment = Pos.CENTER_LEFT }
@@ -145,12 +155,17 @@ class NetWindow : ProjectAware {
         exportCsvButton.setOnAction { exportCsv() }
         saveButton.setOnAction { saveNets() }
         revertButton.setOnAction { revertChanges() }
+        addConnectionButton.setOnAction { addConnection() }
+        deleteConnectionButton.setOnAction { deleteConnection() }
 
-        netListView.selectionModel.selectedItemProperty().addListener { _, _, newNet ->
-            selectedNetIndex = nets.indexOf(newNet)
-            if (newNet != null) {
-                connectionsLabel.text = "${I18n.tr("net.label.connections.for")} '${newNet.name}'"
-                connectionsList.setAll(newNet.connections.toList())
+        netListView.selectionModel.selectedItemProperty().addListener { _, _, selectedNetName ->
+            if (selectedNetName != null) {
+                val net = nets.find { it.name == selectedNetName }
+                if (net != null) {
+                    selectedNetIndex = nets.indexOf(net)
+                    connectionsLabel.text = "${I18n.tr("net.label.connections.for")} '$selectedNetName'"
+                    connectionsList.setAll(net.connections.toList())
+                }
             } else {
                 connectionsLabel.text = I18n.tr("net.label.connections.for")
                 connectionsList.clear()
@@ -172,20 +187,24 @@ class NetWindow : ProjectAware {
                 return
             }
             nets.add(Net(name = netName, connections = emptyList()))
-            netListView.selectionModel.select(nets.last())
+            netNames.add(netName)
+            netListView.selectionModel.select(netName)
             markDirty()
+            refreshMatrix()
             logger.info("Net added: $netName")
         }
     }
 
     private fun deleteNet() {
-        val selected = netListView.selectionModel.selectedItem ?: return
-        if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("net.alert.delete.net"), I18n.tr("net.alert.delete.net.text", selected.name))) return
-        nets.remove(selected)
+        val selectedNetName = netListView.selectionModel.selectedItem ?: return
+        if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("net.alert.delete.net"), I18n.tr("net.alert.delete.net.text", selectedNetName))) return
+        nets.removeAll { it.name == selectedNetName }
+        netNames.remove(selectedNetName)
         selectedNetIndex = -1
         connectionsList.clear()
         markDirty()
-        logger.info("Net deleted: ${selected.name}")
+        refreshMatrix()
+        logger.info("Net deleted: $selectedNetName")
     }
 
     private fun addConnection() {
@@ -200,14 +219,19 @@ class NetWindow : ProjectAware {
             return
         }
 
-        val refDesComboBox = ComboBox<BomItem>().apply { items.setAll(bomItems) }
-        val pinComboBox = ComboBox<String>()
-
-        refDesComboBox.cellFactory = javafx.util.Callback {
-            javafx.scene.control.ListCell<BomItem>().apply {
-                setOnMousePressed {} // workaround
-            }
+        val refDesComboBox = ComboBox<BomItem>().apply {
+            items.setAll(bomItems)
+            @Suppress("UNCHECKED_CAST")
+            cellFactory = javafx.util.Callback { _: ListView<BomItem> ->
+                object : ListCell<BomItem>() {
+                    override fun updateItem(item: BomItem?, empty: Boolean) {
+                        super.updateItem(item, empty)
+                        text = if (empty || item == null) null else item.refDes
+                    }
+                }
+            } as javafx.util.Callback<ListView<BomItem>, ListCell<BomItem>>
         }
+        val pinComboBox = ComboBox<String>()
 
         refDesComboBox.valueProperty().addListener { _, _, newRefDes ->
             pinComboBox.items.clear()
@@ -258,11 +282,11 @@ class NetWindow : ProjectAware {
                     UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.connection.exists"))
                     return
                 }
-                val updatedNets = nets.toMutableList()
-                updatedNets[selectedNetIndex] = currentNet.copy(connections = currentNet.connections + connection)
-                nets.setAll(updatedNets)
-                connectionsList.add(connection)
+                val updatedNet = currentNet.copy(connections = currentNet.connections + connection)
+                nets[selectedNetIndex] = updatedNet
+                connectionsList.setAll(updatedNet.connections.toList())
                 markDirty()
+                refreshMatrix()
                 logger.info("Connection added: ${connection.refDes}.${connection.pinNumber}")
             }
         }
@@ -272,16 +296,23 @@ class NetWindow : ProjectAware {
         val selected = connectionsTable.selectionModel.selectedItem ?: return
         if (selectedNetIndex < 0 || selectedNetIndex >= nets.size) return
         val currentNet = nets[selectedNetIndex]
-        val updatedNets = nets.toMutableList()
-        updatedNets[selectedNetIndex] = currentNet.copy(connections = currentNet.connections.filter { it != selected })
-        nets.setAll(updatedNets)
-        connectionsList.remove(selected)
+        val updatedNets = currentNet.connections.filter { it != selected }
+        val updatedNet = currentNet.copy(connections = updatedNets)
+        nets[selectedNetIndex] = updatedNet
+        connectionsList.setAll(updatedNet.connections.toList())
         markDirty()
+        refreshMatrix()
         logger.info("Connection deleted: ${selected.refDes}.${selected.pinNumber}")
     }
 
     private fun refreshMatrix() {
         if (nets.isEmpty()) { matrixTable.items.clear(); return }
+
+        val bomItems = projectPath?.let { BomRepository.load(it).items } ?: emptyList()
+        if (bomItems.isEmpty()) {
+            matrixTable.items.clear()
+            return
+        }
 
         val portRefs = mutableSetOf<String>()
         nets.forEach { net -> net.connections.forEach { portRefs.add("${it.refDes}.${it.pinNumber}") } }
@@ -411,6 +442,23 @@ class NetWindow : ProjectAware {
         }
     }
 
+    /** Диалог подтверждения закрытия при несохранённых изменениях. */
+    private fun showCloseConfirmation() {
+        val alert = Alert(Alert.AlertType.CONFIRMATION)
+        alert.title = I18n.tr("bom.alert.unsaved")
+        alert.headerText = I18n.tr("bom.alert.unsaved.header")
+        alert.contentText = I18n.tr("bom.alert.unsaved.text")
+
+        val result = alert.showAndWait()
+        when {
+            result.orElse(ButtonType.CANCEL) == ButtonType.YES -> {
+                saveNets()
+                if (!isDirty()) stage.close()
+            }
+            result.orElse(ButtonType.CANCEL) == ButtonType.NO -> stage.close()
+        }
+    }
+
     private fun serializeCurrentState(): String {
         return nets.map { net ->
             "${net.name}|${net.connections.sortedBy { it.refDes + it.pinNumber }.joinToString(";") { "${it.refDes}.${it.pinNumber}" }}"
@@ -418,7 +466,10 @@ class NetWindow : ProjectAware {
     }
 
     private fun isDirty(): Boolean = serializeCurrentState() != savedSnapshot
-    private fun markDirty() {}
+    private fun markDirty() {
+        statusLabel.text = I18n.tr("bom.alert.unsaved")
+        statusLabel.style = "-fx-text-fill: orange; -fx-font-size: 11;"
+    }
 
     override fun showWindow() = stage.show()
 
@@ -427,9 +478,11 @@ class NetWindow : ProjectAware {
         projectLabel.text = "Project: ${projectPath.toString()}"
         val doc = NetRepository.load(projectPath)
         nets.setAll(doc.nets)
+        netNames.setAll(doc.nets.map { it.name })
         savedSnapshot = serializeCurrentState()
         selectedNetIndex = -1
         connectionsList.clear()
+        refreshMatrix()
         logger.info("Netlist opened for project: $projectPath, nets count: ${nets.size}")
     }
 

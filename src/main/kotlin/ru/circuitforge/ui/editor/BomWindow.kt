@@ -16,6 +16,7 @@ import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
+import javafx.util.Callback
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -108,7 +109,11 @@ class BomWindow : ProjectAware {
 
         grid.children.addAll(refDesLabel, refDesField, commentLabel, commentField)
 
-        return VBox(10.0, Label(I18n.tr("bom.label.edit.selected")), grid).apply {
+        // Кнопка сохранения
+        val saveEditButton = Button(I18n.tr("bom.btn.save.selected"))
+        saveEditButton.onAction = EventHandler { saveSelectedEdit() }
+
+        return VBox(10.0, Label(I18n.tr("bom.label.edit.selected")), grid, saveEditButton).apply {
             padding = Insets(10.0)
         }
     }
@@ -207,7 +212,7 @@ class BomWindow : ProjectAware {
         // Можно добавить визуальный индикатор изменений
     }
 
-    /** Показывает ChoiceDialog со списком компонентов для добавления элемента. */
+    /** Показывает диалог выбора компонента для добавления элемента BOM. */
     private fun showAddItemForm() {
         val components = projectPath?.let { dir ->
             ComponentRepository.listComponents(dir)
@@ -218,17 +223,48 @@ class BomWindow : ProjectAware {
             return
         }
 
-        val dialog = ChoiceDialog(components.first(), components.map { "${it.name} (${it.refPrefix})" }.toTypedArray())
+        val comboBox = ComboBox<ComponentSummary>().apply {
+            items.setAll(components)
+            @Suppress("UNCHECKED_CAST")
+            cellFactory = Callback { _: ListView<ComponentSummary> ->
+                object : ListCell<ComponentSummary>() {
+                    override fun updateItem(item: ComponentSummary?, empty: Boolean) {
+                        super.updateItem(item, empty)
+                        text = if (empty || item == null) {
+                            null
+                        } else {
+                            "${item.name} (${item.refPrefix})"
+                        }
+                    }
+                }
+            } as Callback<ListView<ComponentSummary>, ListCell<ComponentSummary>>
+        }
+
+        val dialog = Dialog<ComponentSummary>()
         dialog.title = I18n.tr("bom.dialog.add")
         dialog.headerText = I18n.tr("bom.dialog.select.component")
-        dialog.contentText = I18n.tr("bom.dialog.choose.component")
+        dialog.dialogPane.buttonTypes.setAll(ButtonType.OK, ButtonType.CANCEL)
+
+        val grid = GridPane()
+        grid.hgap = 10.0
+        grid.vgap = 8.0
+        grid.padding = Insets(10.0)
+        GridPane.setConstraints(Label(I18n.tr("bom.dialog.choose.component")), 0, 0)
+        GridPane.setConstraints(comboBox, 1, 0)
+        grid.children.setAll(
+            Label(I18n.tr("bom.dialog.choose.component")), comboBox
+        )
+        dialog.dialogPane.content = grid
+
+        dialog.dialogPane.lookupButton(ButtonType.OK).disableProperty().bind(
+            comboBox.valueProperty().isNull()
+        )
 
         val result = dialog.showAndWait()
-        if (result.isPresent) {
-            val selectedIndex = components.map { "${it.name} (${it.refPrefix})" }
-                .indexOf(result.get())
-            if (selectedIndex >= 0) {
-                addItemFromComponent(components[selectedIndex])
+        if (result.isPresent && result.get() == ButtonType.OK) {
+            val selected = comboBox.value
+            if (selected != null) {
+                addItemFromComponent(selected)
             }
         }
     }
@@ -255,6 +291,34 @@ class BomWindow : ProjectAware {
 
         bomItems.add(newItem)
         markDirty()
+    }
+
+    /** Сохраняет изменения из формы "Редактировать выбранное". */
+    private fun saveSelectedEdit() {
+        val selected = tableView.selectionModel.selectedItem ?: return
+        val newRefDes = refDesField.text.trim()
+        val newComment = commentField.text.trim()
+
+        // Валидация
+        if (newRefDes.isBlank()) {
+            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.required"))
+            return
+        }
+
+        // Проверка уникальности RefDes
+        val refDesList = bomItems.map { it.refDes }
+        if (refDesList.filter { it == newRefDes }.size > 1) {
+            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.unique"))
+            return
+        }
+
+        // Обновляем строку
+        val updatedItem = selected.copy(refDes = newRefDes, comment = newComment)
+        val index = bomItems.indexOf(selected)
+        bomItems[index] = updatedItem
+
+        markDirty()
+        logger.info("BOM item updated: ${updatedItem.refDes}")
     }
 
     /** Дублирует выбранную строку. */
