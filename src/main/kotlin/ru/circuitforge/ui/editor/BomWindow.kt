@@ -18,7 +18,10 @@ import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.Executors
+
+private const val CFCOMP_EXT = ".cfcomp"
 
 /**
  * Полноформатное окно редактора ПЭ3 (BOM).
@@ -150,7 +153,7 @@ class BomWindow : ProjectAware {
     private fun resolveComponentName(slug: String): String {
         if (slug.isBlank()) return I18n.tr("bom.placeholder.not.found")
         projectPath?.let { dir ->
-            val compPath = dir.resolve("components").resolve(slug)
+            val compPath = dir.resolve("components").resolve("${slug}$CFCOMP_EXT")
             if (Files.exists(compPath)) {
                 try {
                     val comp = ComponentRepository.load(compPath)
