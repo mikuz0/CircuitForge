@@ -1,5 +1,7 @@
 package ru.circuitforge.project
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.EncodeDefault.Mode.ALWAYS
 import kotlinx.serialization.Serializable
 
 /**
@@ -17,6 +19,7 @@ data class NetConnection(
 @Serializable
 data class Net(
     val name: String = "",
+    @EncodeDefault(ALWAYS)
     val connections: List<NetConnection> = emptyList()
 )
 

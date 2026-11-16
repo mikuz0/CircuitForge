@@ -214,6 +214,7 @@ class NetWindow : ProjectAware {
         }
 
         val bomItems = projectPath?.let { BomRepository.load(it).items } ?: emptyList()
+        logger.info("addConnection: bomItems count = ${bomItems.size}, projectPath = $projectPath")
         if (bomItems.isEmpty()) {
             UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.no.bom"))
             return
@@ -221,15 +222,7 @@ class NetWindow : ProjectAware {
 
         val refDesComboBox = ComboBox<BomItem>().apply {
             items.setAll(bomItems)
-            @Suppress("UNCHECKED_CAST")
-            cellFactory = javafx.util.Callback { _: ListView<BomItem> ->
-                object : ListCell<BomItem>() {
-                    override fun updateItem(item: BomItem?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        text = if (empty || item == null) null else item.refDes
-                    }
-                }
-            } as javafx.util.Callback<ListView<BomItem>, ListCell<BomItem>>
+            logger.info("addConnection: ComboBox items count = ${items.size}")
         }
         val pinComboBox = ComboBox<String>()
 
