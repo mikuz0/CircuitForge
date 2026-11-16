@@ -3,6 +3,7 @@ package ru.circuitforge.ui.projects
 import javafx.concurrent.Task
 import org.slf4j.LoggerFactory
 import ru.circuitforge.app.SettingsStore
+import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.ProjectInfo
 import ru.circuitforge.project.ProjectRepository
 import java.nio.file.Files
@@ -38,12 +39,12 @@ class ProjectsController(private val view: ProjectsView) {
         }
         task.setOnSucceeded {
             view.setProjects(task.value)
-            view.setStatus("Loaded ${task.value.size} project(s)")
+            view.setStatus(I18n.tr("projects.status.loaded", task.value.size))
             updateModuleButtonsState()
         }
         task.setOnFailed {
             logger.error("Failed to load projects from $dir", task.exception)
-            view.setStatus("Failed to load projects: ${task.exception?.message}", true)
+            view.setStatus(I18n.tr("projects.status.load.failed", task.exception?.message ?: ""), true)
         }
         executor.submit(task)
     }
@@ -54,13 +55,13 @@ class ProjectsController(private val view: ProjectsView) {
         val workspaceStr = view.workspacePath()
 
         if (name.isBlank()) {
-            view.setStatus("Project name cannot be blank", true)
+            view.setStatus(I18n.tr("projects.status.name.blank"), true)
             return
         }
 
         val workspace = Path.of(workspaceStr)
         if (!Files.exists(workspace)) {
-            view.setStatus("Workspace does not exist: $workspace", true)
+            view.setStatus(I18n.tr("projects.status.workspace.not.found", workspace), true)
             return
         }
 
@@ -72,7 +73,7 @@ class ProjectsController(private val view: ProjectsView) {
 
         task.setOnSucceeded {
             view.clearNewProjectName()
-            view.setStatus("Project '$name' created successfully")
+            view.setStatus(I18n.tr("projects.status.created", name))
             loadProjects(workspace)
             // Автоматически выделяем созданный проект
             view.selectProjectByName(name)
@@ -80,8 +81,8 @@ class ProjectsController(private val view: ProjectsView) {
         }
 
         task.setOnFailed {
-            val errorMsg = task.exception?.message ?: "Unknown error"
-            view.setStatus("Failed to create project: $errorMsg", true)
+            val errorMsg = task.exception?.message ?: ""
+            view.setStatus(I18n.tr("projects.status.create.failed", errorMsg), true)
             logger.error("Failed to create project '$name'", task.exception)
         }
 

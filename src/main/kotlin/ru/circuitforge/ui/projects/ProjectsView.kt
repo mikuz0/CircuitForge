@@ -1,10 +1,12 @@
 package ru.circuitforge.ui.projects
 
+import javafx.collections.FXCollections
 import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.*
 import javafx.scene.layout.*
+import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.ProjectInfo
 
 /**
@@ -14,11 +16,11 @@ import ru.circuitforge.project.ProjectInfo
 class ProjectsView {
     // Workspace секция
     private val workspacePathField = TextField().apply { isEditable = false }
-    private val chooseWorkspaceBtn = Button("Choose workspace...")
+    private val chooseWorkspaceBtn = Button()
 
     // New project секция
     private val newProjectNameField = TextField()
-    private val createProjectBtn = Button("Create")
+    private val createProjectBtn = Button()
 
     // Статус/ошибки
     private val statusLabel = Label()
@@ -29,9 +31,16 @@ class ProjectsView {
     }
 
     // Кнопки модулей
-    private val bomBtn = Button("ПЭ3")
-    private val netsBtn = Button("Связи")
-    private val componentsBtn = Button("Компоненты")
+    private val bomBtn = Button()
+    private val netsBtn = Button()
+    private val componentsBtn = Button()
+
+    // Выбор языка
+    private val localeComboBox = ComboBox<I18n.LocaleType>().apply {
+        items.setAll(I18n.LocaleType.values().toList())
+        valueProperty().value = I18n.getCurrentLocale()
+        minWidth = 120.0
+    }
 
     // Callback-свойства
     var onChooseWorkspace: (() -> Unit)? = null
@@ -39,6 +48,7 @@ class ProjectsView {
     var onBomClick: (() -> Unit)? = null
     var onNetsClick: (() -> Unit)? = null
     var onComponentsClick: (() -> Unit)? = null
+    var onLocaleChange: ((I18n.LocaleType) -> Unit)? = null
 
     private val root = VBox(10.0).apply {
         padding = Insets(15.0)
@@ -47,7 +57,7 @@ class ProjectsView {
 
         // Workspace секция
         val workspaceSection = VBox(5.0,
-            Label("Workspace:"),
+            Label(),
             HBox(10.0, workspacePathField, chooseWorkspaceBtn).apply {
                 alignment = Pos.CENTER_LEFT
                 HBox.setHgrow(workspacePathField, Priority.ALWAYS)
@@ -59,7 +69,7 @@ class ProjectsView {
 
         // New project секция
         val newProjectSection = VBox(5.0,
-            Label("New project:"),
+            Label(),
             HBox(10.0, newProjectNameField, createProjectBtn).apply {
                 alignment = Pos.CENTER_LEFT
                 HBox.setHgrow(newProjectNameField, Priority.ALWAYS)
@@ -75,10 +85,17 @@ class ProjectsView {
         }
 
         // Список проектов
-        val listSection = VBox(5.0, Label("Projects:"), listView).apply {
+        val listSection = VBox(5.0, Label(), listView).apply {
             VBox.setVgrow(listView, Priority.ALWAYS)
             padding = Insets(5.0)
             style = "-fx-background-color: white; -fx-border-color: #ccc; -fx-border-width: 1; -fx-border-radius: 3;"
+        }
+
+        // Выбор языка
+        val localeSection = HBox(10.0, Label(I18n.tr("projects.label.language")), localeComboBox).apply {
+            alignment = Pos.CENTER_LEFT
+            padding = Insets(5.0)
+            style = "-fx-background-color: #f0f0f0; -fx-padding: 5; -fx-border-radius: 3;"
         }
 
         // Кнопки модулей
@@ -89,12 +106,36 @@ class ProjectsView {
         }
         setModuleButtonsEnabled(false)
 
-        children.addAll(workspaceSection, newProjectSection, statusLabel, listSection, moduleButtons)
+        children.addAll(workspaceSection, newProjectSection, statusLabel, listSection, localeSection, moduleButtons)
     }
 
     /** Строит сцену. */
     fun buildScene(): Scene {
+        updateLabels()
         return Scene(root, 700.0, 500.0)
+    }
+
+    /** Перестраивает сцену с новыми переводами. */
+    fun rebuildScene() {
+        updateLabels()
+    }
+
+    /** Обновляет все тексты на текущий язык. */
+    private fun updateLabels() {
+        chooseWorkspaceBtn.text = I18n.tr("projects.btn.choose.workspace")
+        createProjectBtn.text = I18n.tr("projects.btn.create")
+        bomBtn.text = I18n.tr("projects.btn.bom")
+        netsBtn.text = I18n.tr("projects.btn.nets")
+        componentsBtn.text = I18n.tr("projects.btn.components")
+
+        // Обновляем Label в секциях
+        val workspaceSection = root.children[0] as VBox
+        val newProjectSection = root.children[1] as VBox
+        val listSection = root.children[3] as VBox
+
+        (workspaceSection.children[0] as Label).text = I18n.tr("projects.label.workspace")
+        (newProjectSection.children[0] as Label).text = I18n.tr("projects.label.new.project")
+        (listSection.children[0] as Label).text = I18n.tr("projects.label.projects")
     }
 
     /** Устанавливает контроллер и подписывает кнопки. */
@@ -104,6 +145,11 @@ class ProjectsView {
         bomBtn.setOnAction { onBomClick?.invoke() }
         netsBtn.setOnAction { onNetsClick?.invoke() }
         componentsBtn.setOnAction { onComponentsClick?.invoke() }
+
+        // Слушатель выбора языка
+        localeComboBox.valueProperty().addListener { _, _, newLocale ->
+            onLocaleChange?.invoke(newLocale)
+        }
 
         // Слушатель изменения выделения — обновляет состояние кнопок модулей
         listView.selectionModel.selectedItemProperty().addListener { _, _, _ ->

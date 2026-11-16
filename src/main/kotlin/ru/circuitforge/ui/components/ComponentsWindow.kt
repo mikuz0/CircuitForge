@@ -9,6 +9,7 @@ import javafx.scene.control.*
 import javafx.scene.layout.*
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
+import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
@@ -50,9 +51,9 @@ class ComponentsWindow : ProjectAware {
     private val model3dField = TextField()
 
     // Кнопки компонентов
-    private val componentSaveButton = Button("Save")
-    private val componentDeleteButton = Button("Delete")
-    private val componentRevertButton = Button("Revert")
+    private val componentSaveButton = Button(I18n.tr("components.btn.save"))
+    private val componentDeleteButton = Button(I18n.tr("components.btn.delete"))
+    private val componentRevertButton = Button(I18n.tr("components.btn.revert"))
 
     // Поля формы порта (для добавления нового порта)
     private val portPinNumberField = TextField()
@@ -60,8 +61,8 @@ class ComponentsWindow : ProjectAware {
     private val portDescField = TextField()
 
     // Кнопки портов
-    private val portAddButton = Button("Add Port")
-    private val portDeleteButton = Button("Delete Port")
+    private val portAddButton = Button(I18n.tr("components.btn.add.port"))
+    private val portDeleteButton = Button(I18n.tr("components.btn.delete.port"))
 
     private var editingComponentSlug: String? = null
 
@@ -69,7 +70,7 @@ class ComponentsWindow : ProjectAware {
     private var isDirty = false
 
     init {
-        stage.title = "Components Editor"
+        stage.title = I18n.tr("components.window.title")
         setupComponentTable()
         setupPortTable()
         setupEventHandlers()
@@ -82,7 +83,7 @@ class ComponentsWindow : ProjectAware {
 
         // Левая панель — таблица компонентов
         val leftPanel = VBox(10.0,
-            Label("Components:"),
+            Label(I18n.tr("components.label.components")),
             componentTable
         ).apply {
             VBox.setVgrow(componentTable, Priority.ALWAYS)
@@ -119,26 +120,32 @@ class ComponentsWindow : ProjectAware {
         grid.vgap = 8.0
         grid.padding = Insets(10.0)
 
-        GridPane.setConstraints(Label("Name:"), 0, 0)
+        // Создаём лейблы один раз и настраиваем их перед добавлением в grid
+        val nameLabel = Label(I18n.tr("components.label.name"))
+        val descLabel = Label(I18n.tr("components.label.description"))
+        val refPrefixLabel = Label(I18n.tr("components.label.ref.prefix"))
+        val model3dLabel = Label(I18n.tr("components.label.model.3d"))
+
+        GridPane.setConstraints(nameLabel, 0, 0)
         GridPane.setConstraints(componentNameField, 1, 0)
-        GridPane.setConstraints(Label("Description:"), 0, 1)
+        GridPane.setConstraints(descLabel, 0, 1)
         GridPane.setConstraints(componentDescField, 1, 1)
-        GridPane.setConstraints(Label("Ref Prefix:"), 0, 2)
+        GridPane.setConstraints(refPrefixLabel, 0, 2)
         GridPane.setConstraints(refPrefixField, 1, 2)
-        GridPane.setConstraints(Label("Model 3D:"), 0, 3)
+        GridPane.setConstraints(model3dLabel, 0, 3)
         GridPane.setConstraints(model3dField, 1, 3)
 
-        grid.children.addAll(
-            Label("Name:"), componentNameField,
-            Label("Description:"), componentDescField,
-            Label("Ref Prefix:"), refPrefixField,
-            Label("Model 3D:"), model3dField
+        grid.children.setAll(
+            nameLabel, componentNameField,
+            descLabel, componentDescField,
+            refPrefixLabel, refPrefixField,
+            model3dLabel, model3dField
         )
 
         val buttonBar = HBox(10.0, componentSaveButton, componentDeleteButton, componentRevertButton)
         buttonBar.alignment = Pos.CENTER_LEFT
 
-        return VBox(10.0, Label("Component Properties:"), grid, buttonBar).apply {
+        return VBox(10.0, Label(I18n.tr("components.label.properties")), grid, buttonBar).apply {
             padding = Insets(10.0)
             minWidth = 300.0
         }
@@ -151,42 +158,47 @@ class ComponentsWindow : ProjectAware {
         grid.vgap = 5.0
         grid.padding = Insets(5.0)
 
-        GridPane.setConstraints(Label("Pin#:"), 0, 0)
+        // Создаём лейблы один раз и настраиваем их перед добавлением в grid
+        val pinLabel = Label(I18n.tr("components.label.pin"))
+        val portNameLabel = Label(I18n.tr("components.label.name"))
+        val portDescLabel = Label(I18n.tr("components.label.description"))
+
+        GridPane.setConstraints(pinLabel, 0, 0)
         GridPane.setConstraints(portPinNumberField, 1, 0)
-        GridPane.setConstraints(Label("Name:"), 0, 1)
+        GridPane.setConstraints(portNameLabel, 0, 1)
         GridPane.setConstraints(portNameField, 1, 1)
-        GridPane.setConstraints(Label("Description:"), 0, 2)
+        GridPane.setConstraints(portDescLabel, 0, 2)
         GridPane.setConstraints(portDescField, 1, 2)
 
-        grid.children.addAll(
-            Label("Pin#:"), portPinNumberField,
-            Label("Name:"), portNameField,
-            Label("Description:"), portDescField
+        grid.children.setAll(
+            pinLabel, portPinNumberField,
+            portNameLabel, portNameField,
+            portDescLabel, portDescField
         )
 
         val buttonBar = HBox(10.0, portAddButton, portDeleteButton)
         buttonBar.alignment = Pos.CENTER_LEFT
 
-        return VBox(10.0, Label("Port Properties:"), grid, buttonBar).apply {
+        return VBox(10.0, Label(I18n.tr("components.label.port.properties")), grid, buttonBar).apply {
             padding = Insets(5.0)
         }
     }
 
     /** Настраивает таблицу компонентов. */
     private fun setupComponentTable() {
-        val nameCol = TableColumn<ComponentSummary, String>("Name")
+        val nameCol = TableColumn<ComponentSummary, String>(I18n.tr("components.col.name"))
         nameCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.name) }
         nameCol.prefWidth = 150.0
 
-        val descCol = TableColumn<ComponentSummary, String>("Description")
+        val descCol = TableColumn<ComponentSummary, String>(I18n.tr("components.col.description"))
         descCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.description) }
         descCol.prefWidth = 200.0
 
-        val refPrefixCol = TableColumn<ComponentSummary, String>("RefPrefix")
+        val refPrefixCol = TableColumn<ComponentSummary, String>(I18n.tr("components.col.ref.prefix"))
         refPrefixCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refPrefix) }
         refPrefixCol.prefWidth = 80.0
 
-        val portsCol = TableColumn<ComponentSummary, String>("Ports")
+        val portsCol = TableColumn<ComponentSummary, String>(I18n.tr("components.col.ports"))
         portsCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.portsCount.toString()) }
         portsCol.prefWidth = 60.0
 
@@ -200,19 +212,19 @@ class ComponentsWindow : ProjectAware {
 
     /** Настраивает таблицу портов. */
     private fun setupPortTable() {
-        val numberCol = TableColumn<Port, String>("#")
+        val numberCol = TableColumn<Port, String>(I18n.tr("components.col.number"))
         numberCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.number.toString()) }
         numberCol.prefWidth = 50.0
 
-        val pinCol = TableColumn<Port, String>("Pin#")
+        val pinCol = TableColumn<Port, String>(I18n.tr("components.col.pin"))
         pinCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.pinNumber) }
         pinCol.prefWidth = 100.0
 
-        val nameCol = TableColumn<Port, String>("Name")
+        val nameCol = TableColumn<Port, String>(I18n.tr("components.col.port.name"))
         nameCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.name) }
         nameCol.prefWidth = 150.0
 
-        val descCol = TableColumn<Port, String>("Description")
+        val descCol = TableColumn<Port, String>(I18n.tr("components.col.port.description"))
         descCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.description) }
         descCol.prefWidth = 200.0
 
@@ -244,12 +256,12 @@ class ComponentsWindow : ProjectAware {
     /** Валидирует refPrefix. */
     private fun validateRefPrefix(prefix: String): Boolean {
         if (prefix.isBlank()) {
-            UiUtils.errorAlert("Error", "Ref Prefix cannot be blank")
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("components.alert.ref.prefix.blank"))
             return false
         }
         val pattern = Regex("^[A-Z0-9_]+$")
         if (!prefix.matches(pattern)) {
-            UiUtils.errorAlert("Error", "Ref Prefix must contain only uppercase letters, digits, and underscores (A-Z0-9_)")
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("components.alert.ref.prefix.pattern"))
             return false
         }
         return true
@@ -263,7 +275,7 @@ class ComponentsWindow : ProjectAware {
         val model3d = model3dField.text.trim().takeIf { it.isNotEmpty() }
 
         if (name.isBlank()) {
-            UiUtils.errorAlert("Error", "Component name cannot be blank")
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("components.alert.name.blank"))
             return
         }
         if (!validateRefPrefix(refPrefix)) return
@@ -301,7 +313,7 @@ class ComponentsWindow : ProjectAware {
             logger.info("Component saved successfully")
         }
         task.setOnFailed {
-            UiUtils.errorAlert("Failed to save component", task.exception?.message ?: "Unknown error")
+            UiUtils.errorAlert(I18n.tr("components.alert.save.failed"), task.exception?.message ?: I18n.tr("common.alert.unknown.error"))
             logger.error("Failed to save component", task.exception)
         }
         executor.submit(task)
@@ -310,7 +322,7 @@ class ComponentsWindow : ProjectAware {
     /** Удаляет выбранный компонент. */
     private fun deleteComponent() {
         val selected = componentTable.selectionModel.selectedItem ?: return
-        if (!UiUtils.confirmAlert("Confirm", "Delete component?", "Delete '${selected.name}'?")) return
+        if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("components.alert.delete.confirm"), I18n.tr("components.alert.delete.confirm.text", selected.name))) return
 
         val task = object : javafx.concurrent.Task<Unit>() {
             override fun call() {
@@ -328,7 +340,7 @@ class ComponentsWindow : ProjectAware {
             logger.info("Component deleted: ${selected.name}")
         }
         task.setOnFailed {
-            UiUtils.errorAlert("Failed to delete component", task.exception?.message ?: "Unknown error")
+            UiUtils.errorAlert(I18n.tr("components.alert.delete.failed"), task.exception?.message ?: I18n.tr("common.alert.unknown.error"))
             logger.error("Failed to delete component", task.exception)
         }
         executor.submit(task)

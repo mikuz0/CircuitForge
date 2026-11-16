@@ -9,6 +9,7 @@ import javafx.scene.layout.*
 import javafx.stage.FileChooser
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
+import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
@@ -35,32 +36,32 @@ class NetWindow : ProjectAware {
     private var savedSnapshot: String = ""
 
     // UI — Toolbar
-    private val addNetButton = Button("Add Net")
-    private val deleteNetButton = Button("Delete Net")
-    private val exportCsvButton = Button("Export CSV")
+    private val addNetButton = Button(I18n.tr("net.btn.add"))
+    private val deleteNetButton = Button(I18n.tr("net.btn.delete"))
+    private val exportCsvButton = Button(I18n.tr("net.btn.export.csv"))
     private val projectLabel = Label("Project: <not opened>")
 
     // UI — Список связей (Tab 1)
     private val netListView = ListView<Net>()
-    private val connectionsLabel = Label("Connections for")
+    private val connectionsLabel = Label()
     private val connectionsTable = TableView<NetConnection>()
     private val connectionsList = FXCollections.observableArrayList<NetConnection>()
-    private val addConnectionButton = Button("Add Connection")
-    private val deleteConnectionButton = Button("Delete Connection")
+    private val addConnectionButton = Button(I18n.tr("net.btn.add.connection"))
+    private val deleteConnectionButton = Button(I18n.tr("net.btn.delete.connection"))
 
     // UI — Матрица (Tab 2)
     private val matrixTable = TableView<NetMatrixCell>()
 
     // UI — Bottom
-    private val saveButton = Button("Save")
-    private val revertButton = Button("Revert")
+    private val saveButton = Button(I18n.tr("net.btn.save"))
+    private val revertButton = Button(I18n.tr("net.btn.revert"))
     private val statusLabel = Label()
 
     // Текущая выбранная цепь
     private var selectedNetIndex: Int = -1
 
     init {
-        stage.title = "Net Editor"
+        stage.title = I18n.tr("net.window.title")
         setupConnectionTable()
         setupToolbar()
         stage.scene = Scene(createRoot(), 1100.0, 700.0)
@@ -87,8 +88,8 @@ class NetWindow : ProjectAware {
         val tabPane = TabPane()
         tabPane.tabMinWidth = 120.0
 
-        val listTab = Tab("Список связей").apply { isClosable = false; content = createListView() }
-        val matrixTab = Tab("Матрица").apply { isClosable = false; content = createMatrixView() }
+        val listTab = Tab(I18n.tr("net.tab.list")).apply { isClosable = false; content = createListView() }
+        val matrixTab = Tab(I18n.tr("net.tab.matrix")).apply { isClosable = false; content = createMatrixView() }
 
         tabPane.tabs.setAll(listTab, matrixTab)
 
@@ -96,7 +97,7 @@ class NetWindow : ProjectAware {
     }
 
     private fun createListView(): SplitPane {
-        val leftPanel = VBox(10.0, Label("Nets:"), netListView).apply {
+        val leftPanel = VBox(10.0, Label(I18n.tr("net.label.nets")), netListView).apply {
             VBox.setVgrow(netListView, Priority.ALWAYS)
             padding = Insets(10.0)
             minWidth = 200.0
@@ -126,11 +127,11 @@ class NetWindow : ProjectAware {
     }
 
     private fun setupConnectionTable() {
-        val refDesCol = TableColumn<NetConnection, String>("RefDes")
+        val refDesCol = TableColumn<NetConnection, String>(I18n.tr("net.col.ref.des"))
         refDesCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refDes) }
         refDesCol.prefWidth = 200.0
 
-        val pinCol = TableColumn<NetConnection, String>("PinNumber")
+        val pinCol = TableColumn<NetConnection, String>(I18n.tr("net.col.pin.number"))
         pinCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.pinNumber) }
         pinCol.prefWidth = 150.0
 
@@ -148,26 +149,26 @@ class NetWindow : ProjectAware {
         netListView.selectionModel.selectedItemProperty().addListener { _, _, newNet ->
             selectedNetIndex = nets.indexOf(newNet)
             if (newNet != null) {
-                connectionsLabel.text = "Connections for '${newNet.name}'"
+                connectionsLabel.text = "${I18n.tr("net.label.connections.for")} '${newNet.name}'"
                 connectionsList.setAll(newNet.connections.toList())
             } else {
-                connectionsLabel.text = "Connections for"
+                connectionsLabel.text = I18n.tr("net.label.connections.for")
                 connectionsList.clear()
             }
         }
     }
 
     private fun addNet() {
-        val dialog = javafx.scene.control.TextInputDialog("Net name")
-        dialog.title = "Add Net"
-        dialog.headerText = "Create a new net"
-        dialog.contentText = "Net name:"
+        val dialog = javafx.scene.control.TextInputDialog("")
+        dialog.title = I18n.tr("net.dialog.add")
+        dialog.headerText = I18n.tr("net.dialog.create")
+        dialog.contentText = I18n.tr("net.dialog.net.name")
 
         val result = dialog.showAndWait()
         if (result.isPresent && result.get().isNotBlank()) {
             val netName = result.get().trim()
             if (nets.any { it.name == netName }) {
-                UiUtils.errorAlert("Error", "Net '$netName' already exists")
+                UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.exists", netName))
                 return
             }
             nets.add(Net(name = netName, connections = emptyList()))
@@ -179,7 +180,7 @@ class NetWindow : ProjectAware {
 
     private fun deleteNet() {
         val selected = netListView.selectionModel.selectedItem ?: return
-        if (!UiUtils.confirmAlert("Confirm", "Delete net?", "Delete '${selected.name}'?")) return
+        if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("net.alert.delete.net"), I18n.tr("net.alert.delete.net.text", selected.name))) return
         nets.remove(selected)
         selectedNetIndex = -1
         connectionsList.clear()
@@ -189,13 +190,13 @@ class NetWindow : ProjectAware {
 
     private fun addConnection() {
         if (selectedNetIndex < 0 || selectedNetIndex >= nets.size) {
-            UiUtils.errorAlert("Error", "Select a net first")
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.select.first"))
             return
         }
 
         val bomItems = projectPath?.let { BomRepository.load(it).items } ?: emptyList()
         if (bomItems.isEmpty()) {
-            UiUtils.errorAlert("Error", "No items in BOM. Open a project with BOM first.")
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.no.bom"))
             return
         }
 
@@ -224,21 +225,21 @@ class NetWindow : ProjectAware {
         }
 
         val dialog = Dialog<Unit>()
-        dialog.title = "Add Connection"
-        dialog.headerText = "Select connection"
+        dialog.title = I18n.tr("net.dialog.add.connection")
+        dialog.headerText = I18n.tr("net.dialog.select.connection")
         dialog.dialogPane.buttonTypes.setAll(ButtonType.OK, ButtonType.CANCEL)
 
         val grid = GridPane()
         grid.hgap = 10.0
         grid.vgap = 8.0
         grid.padding = Insets(10.0)
-        GridPane.setConstraints(Label("RefDes:"), 0, 0)
+        GridPane.setConstraints(Label(I18n.tr("net.label.ref.des")), 0, 0)
         GridPane.setConstraints(refDesComboBox, 1, 0)
-        GridPane.setConstraints(Label("Pin#:"), 0, 1)
+        GridPane.setConstraints(Label(I18n.tr("net.label.pin")), 0, 1)
         GridPane.setConstraints(pinComboBox, 1, 1)
         grid.children.setAll(
-            Label("RefDes:"), refDesComboBox,
-            Label("Pin#:"), pinComboBox
+            Label(I18n.tr("net.label.ref.des")), refDesComboBox,
+            Label(I18n.tr("net.label.pin")), pinComboBox
         )
         dialog.dialogPane.content = grid
 
@@ -254,7 +255,7 @@ class NetWindow : ProjectAware {
                 val connection = NetConnection(refDes = selectedRefDes.refDes, pinNumber = selectedPin)
                 val currentNet = nets[selectedNetIndex]
                 if (currentNet.connections.any { it.refDes == connection.refDes && it.pinNumber == connection.pinNumber }) {
-                    UiUtils.errorAlert("Error", "Connection already exists")
+                    UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.connection.exists"))
                     return
                 }
                 val updatedNets = nets.toMutableList()
@@ -347,7 +348,7 @@ class NetWindow : ProjectAware {
 
     private fun exportCsv() {
         val chooser = FileChooser()
-        chooser.title = "Export Netlist to CSV"
+        chooser.title = I18n.tr("net.dialog.export.csv")
         chooser.initialFileName = "nets.csv"
         chooser.extensionFilters.add(FileChooser.ExtensionFilter("CSV Files", "*.csv"))
         val projectDir = projectPath ?: return
@@ -360,12 +361,12 @@ class NetWindow : ProjectAware {
                 override fun call() { NetRepository.exportToCsv(projectPath!!, file.toPath()) }
             }
             task.setOnSucceeded {
-                statusLabel.text = "Exported to ${file.path}"
+                statusLabel.text = I18n.tr("net.status.exported", file.path)
                 statusLabel.style = "-fx-text-fill: green;"
             }
             task.setOnFailed {
-                UiUtils.errorAlert("Export failed", task.exception?.message ?: "Unknown error")
-                statusLabel.text = "Export failed"
+                UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.status.export.failed"))
+                statusLabel.text = I18n.tr("net.status.export.failed")
                 statusLabel.style = "-fx-text-fill: red;"
             }
             executor.submit(task)
@@ -382,15 +383,15 @@ class NetWindow : ProjectAware {
             }
         }
         task.setOnSucceeded {
-            statusLabel.text = "Saved successfully"
+            statusLabel.text = I18n.tr("net.status.saved")
             statusLabel.style = "-fx-text-fill: green;"
             logger.info("Netlist saved")
         }
         task.setOnFailed {
             val ex = task.exception
-            if (ex is IllegalArgumentException) UiUtils.errorAlert("Validation Error", ex.message ?: "Unknown")
-            else UiUtils.errorAlert("Save failed", ex?.message ?: "Unknown error")
-            statusLabel.text = "Save failed"
+            if (ex is IllegalArgumentException) UiUtils.errorAlert(I18n.tr("net.alert.validation.error"), ex.message ?: I18n.tr("common.alert.unknown.error"))
+            else UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.status.save.failed"))
+            statusLabel.text = I18n.tr("net.status.save.failed")
             statusLabel.style = "-fx-text-fill: red;"
             logger.error("Failed to save netlist", ex)
         }
@@ -404,7 +405,7 @@ class NetWindow : ProjectAware {
             savedSnapshot = serializeCurrentState()
             selectedNetIndex = -1
             connectionsList.clear()
-            statusLabel.text = "Reverted to last saved state"
+            statusLabel.text = I18n.tr("net.status.reverted")
             statusLabel.style = "-fx-text-fill: blue;"
             logger.info("Netlist reverted")
         }

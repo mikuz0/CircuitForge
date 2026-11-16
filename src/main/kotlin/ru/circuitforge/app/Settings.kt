@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import ru.circuitforge.i18n.I18n
 import java.nio.file.Files
 
 /**
@@ -12,7 +13,8 @@ import java.nio.file.Files
  */
 @Serializable
 data class Settings(
-    val workspace: String? = null
+    val workspace: String? = null,
+    val locale: String = I18n.LocaleType.EN.name
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(Settings::class.java)
@@ -21,6 +23,16 @@ data class Settings(
             ignoreUnknownKeys = true
         }
     }
+
+    /** Получить текущий язык. */
+    fun getLocale(): I18n.LocaleType = try {
+        I18n.LocaleType.valueOf(locale)
+    } catch (e: Exception) {
+        I18n.LocaleType.EN
+    }
+
+    /** Создать копию с новым языком. */
+    fun withLocale(locale: I18n.LocaleType): Settings = copy(locale = locale.name)
 }
 
 /**

@@ -12,6 +12,7 @@ import javafx.scene.input.KeyEvent
 import javafx.scene.layout.*
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
+import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
@@ -41,19 +42,19 @@ class BomWindow : ProjectAware {
     private val tableView = TableView<BomItem>()
 
     // Toolbar кнопки
-    private val addButton = Button("Add Item")
-    private val duplicateButton = Button("Duplicate")
-    private val deleteButton = Button("Delete")
-    private val saveButton = Button("Save")
-    private val revertButton = Button("Revert")
-    private val closeButton = Button("Close")
+    private val addButton = Button(I18n.tr("bom.btn.add"))
+    private val duplicateButton = Button(I18n.tr("bom.btn.duplicate"))
+    private val deleteButton = Button(I18n.tr("bom.btn.delete"))
+    private val saveButton = Button(I18n.tr("bom.btn.save"))
+    private val revertButton = Button(I18n.tr("bom.btn.revert"))
+    private val closeButton = Button(I18n.tr("bom.btn.close"))
 
     // Форма для редактирования выбранной строки
     private val refDesField = TextField()
     private val commentField = TextField()
 
     init {
-        stage.title = "BOM Editor (ПЭ3)"
+        stage.title = I18n.tr("bom.window.title")
         setupTableView()
         setupToolbar()
         setupHotKeys()
@@ -95,8 +96,8 @@ class BomWindow : ProjectAware {
         grid.padding = Insets(10.0)
         grid.style = "-fx-background-color: #fafafa; -fx-border-color: #dddddd; -fx-border-width: 1 0 0 0;"
 
-        val refDesLabel = Label("RefDes:")
-        val commentLabel = Label("Comment:")
+        val refDesLabel = Label(I18n.tr("bom.label.ref.des"))
+        val commentLabel = Label(I18n.tr("bom.label.comment"))
         GridPane.setConstraints(refDesLabel, 0, 0)
         GridPane.setConstraints(refDesField, 1, 0)
         GridPane.setConstraints(commentLabel, 0, 1)
@@ -104,7 +105,7 @@ class BomWindow : ProjectAware {
 
         grid.children.addAll(refDesLabel, refDesField, commentLabel, commentField)
 
-        return VBox(10.0, Label("Edit Selected:"), grid).apply {
+        return VBox(10.0, Label(I18n.tr("bom.label.edit.selected")), grid).apply {
             padding = Insets(10.0)
         }
     }
@@ -112,24 +113,24 @@ class BomWindow : ProjectAware {
     /** Настраивает TableView с колонками. */
     private fun setupTableView() {
         // Колонка # — порядковый номер (readonly)
-        val numberCol = TableColumn<BomItem, String>("#")
+        val numberCol = TableColumn<BomItem, String>(I18n.tr("bom.col.number"))
         numberCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.number.toString()) }
         numberCol.isEditable = false
         numberCol.prefWidth = 50.0
 
         // Колонка RefDes — позиционное обозначение (readonly, редактируем через форму)
-        val refDesCol = TableColumn<BomItem, String>("RefDes")
+        val refDesCol = TableColumn<BomItem, String>(I18n.tr("bom.col.ref.des"))
         refDesCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refDes) }
         refDesCol.prefWidth = 200.0
 
         // Колонка Component — наименование из библиотеки (readonly)
-        val componentCol = TableColumn<BomItem, String>("Component")
+        val componentCol = TableColumn<BomItem, String>(I18n.tr("bom.col.component"))
         componentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(resolveComponentName(it.value.componentSlug)) }
         componentCol.isEditable = false
         componentCol.prefWidth = 250.0
 
         // Колонка Comment — комментарий (readonly, редактируем через форму)
-        val commentCol = TableColumn<BomItem, String>("Comment")
+        val commentCol = TableColumn<BomItem, String>(I18n.tr("bom.col.comment"))
         commentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.comment) }
         commentCol.prefWidth = 300.0
 
@@ -147,7 +148,7 @@ class BomWindow : ProjectAware {
 
     /** Разрешает имя компонента по slug. */
     private fun resolveComponentName(slug: String): String {
-        if (slug.isBlank()) return "<not found>"
+        if (slug.isBlank()) return I18n.tr("bom.placeholder.not.found")
         projectPath?.let { dir ->
             val compPath = dir.resolve("components").resolve(slug)
             if (Files.exists(compPath)) {
@@ -159,7 +160,7 @@ class BomWindow : ProjectAware {
                 }
             }
         }
-        return "<not found: $slug>"
+        return I18n.tr("bom.placeholder.not.found.detail", slug)
     }
 
     /** Создаёт и подписывает toolbar. */
@@ -210,14 +211,14 @@ class BomWindow : ProjectAware {
         } ?: emptyList()
 
         if (components.isEmpty()) {
-            UiUtils.errorAlert("No components", "No components found. Add components first.")
+            UiUtils.errorAlert(I18n.tr("bom.alert.no.components"), I18n.tr("bom.alert.no.components.text"))
             return
         }
 
         val dialog = ChoiceDialog(components.first(), components.map { "${it.name} (${it.refPrefix})" }.toTypedArray())
-        dialog.title = "Add BOM Item"
-        dialog.headerText = "Select a component"
-        dialog.contentText = "Choose component:"
+        dialog.title = I18n.tr("bom.dialog.add")
+        dialog.headerText = I18n.tr("bom.dialog.select.component")
+        dialog.contentText = I18n.tr("bom.dialog.choose.component")
 
         val result = dialog.showAndWait()
         if (result.isPresent) {
@@ -282,7 +283,7 @@ class BomWindow : ProjectAware {
     /** Удаляет выбранную строку. */
     private fun deleteRow() {
         val selected = tableView.selectionModel.selectedItem ?: return
-        if (!UiUtils.confirmAlert("Confirm", "Delete row?", "Delete '${selected.refDes}'?")) return
+        if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("bom.alert.delete.row"), I18n.tr("bom.alert.delete.row.text", selected.refDes))) return
         bomItems.remove(selected)
         markDirty()
     }
@@ -292,11 +293,11 @@ class BomWindow : ProjectAware {
         // Валидация: все RefDes должны быть заполнены и уникальны
         val refDesList = bomItems.map { it.refDes }
         if (refDesList.any { it.isBlank() }) {
-            UiUtils.errorAlert("Validation Error", "All RefDes must be filled in.")
+            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.required"))
             return
         }
         if (refDesList.size != refDesList.toSet().size) {
-            UiUtils.errorAlert("Validation Error", "All RefDes must be unique. Duplicate found.")
+            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.unique"))
             return
         }
 
@@ -318,13 +319,13 @@ class BomWindow : ProjectAware {
 
         task.setOnSucceeded {
             val alert = Alert(Alert.AlertType.INFORMATION)
-            alert.title = "Success"
+            alert.title = I18n.tr("bom.alert.success")
             alert.headerText = null
-            alert.contentText = "BOM saved successfully"
+            alert.contentText = I18n.tr("bom.alert.saved")
             alert.showAndWait()
         }
         task.setOnFailed {
-            UiUtils.errorAlert("Failed to save BOM", task.exception?.message ?: "Unknown error")
+            UiUtils.errorAlert(I18n.tr("bom.alert.save.failed"), task.exception?.message ?: I18n.tr("common.alert.unknown.error"))
             logger.error("Failed to save BOM", task.exception)
         }
         executor.submit(task)
@@ -344,9 +345,9 @@ class BomWindow : ProjectAware {
     private fun handleWindowClosing() {
         if (isDirty()) {
             val alert = Alert(Alert.AlertType.CONFIRMATION)
-            alert.title = "Unsaved Changes"
-            alert.headerText = "You have unsaved changes"
-            alert.contentText = "Do you want to save before closing?"
+            alert.title = I18n.tr("bom.alert.unsaved")
+            alert.headerText = I18n.tr("bom.alert.unsaved.header")
+            alert.contentText = I18n.tr("bom.alert.unsaved.text")
 
             val result = alert.showAndWait()
             when {
