@@ -4,6 +4,8 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.EncodeDefault.Mode.ALWAYS
 import kotlinx.serialization.Serializable
 
+
+
 /**
  * Подключение: привязка refDes к номеру пина.
  */
@@ -28,6 +30,7 @@ data class Net(
  */
 @Serializable
 data class NetDocument(
+    @EncodeDefault(ALWAYS) // <--- ДОБАВИТЬ ЭТУ СТРОКУ
     val schemaVersion: Int = 1,
     val nets: List<Net> = emptyList()
 )

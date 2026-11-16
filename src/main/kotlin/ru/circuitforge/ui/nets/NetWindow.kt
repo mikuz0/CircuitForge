@@ -66,7 +66,7 @@ class NetWindow : ProjectAware {
         setupConnectionTable()
         setupToolbar()
         stage.scene = Scene(createRoot(), 1100.0, 700.0)
-        
+
         // Защита от потери данных при закрытии
         stage.setOnCloseRequest { event ->
             if (isDirty()) {
@@ -101,7 +101,6 @@ class NetWindow : ProjectAware {
         val matrixTab = Tab(I18n.tr("net.tab.matrix")).apply { isClosable = false; content = createMatrixView() }
 
         tabPane.tabs.setAll(listTab, matrixTab)
-
         return tabPane
     }
 
@@ -153,10 +152,13 @@ class NetWindow : ProjectAware {
         addNetButton.setOnAction { addNet() }
         deleteNetButton.setOnAction { deleteNet() }
         exportCsvButton.setOnAction { exportCsv() }
-        saveButton.setOnAction { saveNets() }
-        revertButton.setOnAction { revertChanges() }
+
+        // Обработчики для соединений
         addConnectionButton.setOnAction { addConnection() }
         deleteConnectionButton.setOnAction { deleteConnection() }
+
+        saveButton.setOnAction { saveNets() }
+        revertButton.setOnAction { revertChanges() }
 
         netListView.selectionModel.selectedItemProperty().addListener { _, _, selectedNetName ->
             if (selectedNetName != null) {
@@ -174,7 +176,7 @@ class NetWindow : ProjectAware {
     }
 
     private fun addNet() {
-        val dialog = javafx.scene.control.TextInputDialog("")
+        val dialog = TextInputDialog("")
         dialog.title = I18n.tr("net.dialog.add")
         dialog.headerText = I18n.tr("net.dialog.create")
         dialog.contentText = I18n.tr("net.dialog.net.name")
@@ -214,7 +216,6 @@ class NetWindow : ProjectAware {
         }
 
         val bomItems = projectPath?.let { BomRepository.load(it).items } ?: emptyList()
-        logger.info("addConnection: bomItems count = ${bomItems.size}, projectPath = $projectPath")
         if (bomItems.isEmpty()) {
             UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.no.bom"))
             return
@@ -222,7 +223,14 @@ class NetWindow : ProjectAware {
 
         val refDesComboBox = ComboBox<BomItem>().apply {
             items.setAll(bomItems)
-            logger.info("addConnection: ComboBox items count = ${items.size}")
+            cellFactory = javafx.util.Callback { _: ListView<BomItem> ->
+                object : ListCell<BomItem>() {
+                    override fun updateItem(item: BomItem?, empty: Boolean) {
+                        super.updateItem(item, empty)
+                        text = if (empty || item == null) null else item.refDes
+                    }
+                }
+            }
         }
         val pinComboBox = ComboBox<String>()
 
@@ -230,18 +238,16 @@ class NetWindow : ProjectAware {
             pinComboBox.items.clear()
             if (newRefDes != null && projectPath != null) {
                 try {
-                    val bomItem = bomItems.find { it.refDes == newRefDes.refDes }
-                    if (bomItem != null) {
-                        val comp = ComponentRepository.loadComponent(projectPath!!, bomItem.componentSlug)
-                        pinComboBox.items.setAll(comp.ports.map { it.pinNumber })
-                    }
+                    val comp = ComponentRepository.loadComponent(projectPath!!, newRefDes.componentSlug)
+                    pinComboBox.items.setAll(comp.ports.map { it.pinNumber })
                 } catch (e: Exception) {
                     logger.warn("Failed to load component", e)
                 }
             }
         }
 
-        val dialog = Dialog<Unit>()
+        // ИЗМЕНЕНИЕ: Dialog<ButtonType> вместо Dialog<Unit>
+        val dialog = Dialog<ButtonType>()
         dialog.title = I18n.tr("net.dialog.add.connection")
         dialog.headerText = I18n.tr("net.dialog.select.connection")
         dialog.dialogPane.buttonTypes.setAll(ButtonType.OK, ButtonType.CANCEL)
@@ -264,8 +270,10 @@ class NetWindow : ProjectAware {
             refDesComboBox.valueProperty().isNull().or(pinComboBox.valueProperty().isNull())
         )
 
-        val result = dialog.showAndWait()
-        if (result.isPresent && result.get() == ButtonType.OK) {
+        // ИЗМЕНЕНИЕ: Используем resultProperty().orElse(CANCEL) == OK
+        val result = dialog.showAndWait().orElse(ButtonType.CANCEL)
+
+        if (result == ButtonType.OK) {
             val selectedRefDes = refDesComboBox.value
             val selectedPin = pinComboBox.value
             if (selectedRefDes != null && selectedPin != null) {
@@ -299,19 +307,18 @@ class NetWindow : ProjectAware {
     }
 
     private fun refreshMatrix() {
-        if (nets.isEmpty()) { matrixTable.items.clear(); return }
+        if (nets.isEmpty()) { matrixTable.items.clear(); matrixTable.columns.clear(); return }
 
-        val bomItems = projectPath?.let { BomRepository.load(it).items } ?: emptyList()
-        if (bomItems.isEmpty()) {
-            matrixTable.items.clear()
-            return
-        }
-
+        // Собираем все уникальные portRefs из всех цепей
         val portRefs = mutableSetOf<String>()
         nets.forEach { net -> net.connections.forEach { portRefs.add("${it.refDes}.${it.pinNumber}") } }
         val sortedPortRefs = portRefs.sorted()
 
-        if (sortedPortRefs.isEmpty()) { matrixTable.items.clear(); return }
+        if (sortedPortRefs.isEmpty()) {
+            matrixTable.items.clear()
+            matrixTable.columns.clear()
+            return
+        }
 
         val matrixRows = FXCollections.observableArrayList<NetMatrixCell>()
         nets.forEach { net ->
@@ -339,10 +346,13 @@ class NetWindow : ProjectAware {
                 javafx.scene.control.TableCell<NetMatrixCell, Boolean>().apply {
                     val checkBox = CheckBox()
                     graphic = checkBox
-                    val cellData = tableRow.getItem()
-                    if (cellData != null) {
-                        checkBox.selectedProperty().setValue(cellData.connected)
-                        checkBox.selectedProperty().addListener { _, _, newVal ->
+                    // Обновляем checkbox при переиспользовании ячейки
+                    itemProperty().addListener { _, _, newVal ->
+                        checkBox.isSelected = newVal ?: false
+                    }
+                    checkBox.selectedProperty().addListener { _, _, newVal ->
+                        val cellData = tableRow.item
+                        if (cellData != null) {
                             val updatedNets = nets.toMutableList()
                             val netIndex = updatedNets.indexOf(cellData.net)
                             if (netIndex >= 0) {
@@ -426,11 +436,13 @@ class NetWindow : ProjectAware {
         projectPath?.let { dir ->
             val doc = NetRepository.load(dir)
             nets.setAll(doc.nets)
+            netNames.setAll(doc.nets.map { it.name })
             savedSnapshot = serializeCurrentState()
             selectedNetIndex = -1
             connectionsList.clear()
             statusLabel.text = I18n.tr("net.status.reverted")
             statusLabel.style = "-fx-text-fill: blue;"
+            refreshMatrix()
             logger.info("Netlist reverted")
         }
     }

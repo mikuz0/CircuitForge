@@ -89,9 +89,10 @@ object BomRepository {
                             // Используем slug из компонента, а не имя файла
                             val slug = comp.slug.takeIf { it.isNotBlank() }
                                 ?: compPath.fileName.toString().removeSuffix(".cfcomp")
+                            val currentNumber = number++
                             items.add(BomItem(
-                                number = number++,
-                                refDes = comp.refPrefix + number,
+                                number = currentNumber,
+                                refDes = comp.refPrefix + currentNumber,
                                 componentSlug = slug,
                                 comment = comp.description
                             ))

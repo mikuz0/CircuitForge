@@ -84,6 +84,21 @@ object ComponentRepository {
             throw IllegalArgumentException("Component with name '$name' already exists")
         }
 
+        // Проверяем, используется ли компонент в BOM
+        val bomDoc = BomRepository.load(projectDir)
+        if (bomDoc.items.any { it.componentSlug == originalSlug }) {
+            throw IllegalArgumentException("Component is used in BOM. Remove it first.")
+        }
+
+        // Проверяем, используется ли компонент в Nets (через refDes в BOM)
+        val bomRefDesForSlug = bomDoc.items.filter { it.componentSlug == originalSlug }.map { it.refDes }.toSet()
+        val netDoc = NetRepository.load(projectDir)
+        if (bomRefDesForSlug.isNotEmpty() && netDoc.nets.any { net ->
+            net.connections.any { conn -> conn.refDes in bomRefDesForSlug }
+        }) {
+            throw IllegalArgumentException("Component is used in Nets. Remove it first.")
+        }
+
         val newSlug = generateUniqueSlug(projectDir, name)
         val component = Component(
             schemaVersion = 1,
