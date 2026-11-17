@@ -307,69 +307,64 @@ class NetWindow : ProjectAware {
     }
 
     private fun refreshMatrix() {
-        if (nets.isEmpty()) { matrixTable.items.clear(); matrixTable.columns.clear(); return }
-
-        // Собираем все уникальные portRefs из всех цепей
-        val portRefs = mutableSetOf<String>()
-        nets.forEach { net -> net.connections.forEach { portRefs.add("${it.refDes}.${it.pinNumber}") } }
-        val sortedPortRefs = portRefs.sorted()
-
-        if (sortedPortRefs.isEmpty()) {
-            matrixTable.items.clear()
-            matrixTable.columns.clear()
-            return
-        }
-
-        val matrixRows = FXCollections.observableArrayList<NetMatrixCell>()
-        nets.forEach { net ->
-            sortedPortRefs.forEach { portRef ->
-                val parts = portRef.split(".", limit = 2)
-                val refDes = parts[0]
-                val pinNumber = if (parts.size > 1) parts[1] else ""
-                val connected = net.connections.any { it.refDes == refDes && it.pinNumber == pinNumber }
-                matrixRows.add(NetMatrixCell(netName = net.name, portRef = portRef, refDes = refDes,
-                    pinNumber = pinNumber, connected = connected, net = net))
-            }
-        }
-
+        matrixTable.items = FXCollections.observableArrayList()
         matrixTable.columns.clear()
 
-        val netNameCol = TableColumn<NetMatrixCell, String>("Net")
+        if (nets.isEmpty()) return
+
+        // 1. Собираем порты ТОЛЬКО из существующих связей (connections)
+        val usedPorts = mutableSetOf<String>()
+        nets.forEach { net ->
+            net.connections.forEach { conn ->
+                usedPorts.add("${conn.refDes}.${conn.pinNumber}")
+            }
+        }
+        val sortedPorts = usedPorts.sorted()
+
+        // Если связей нет вообще — матрица пустая (только колонка "Цепь")
+        // 2. Формируем строки
+        val matrixRows = FXCollections.observableArrayList<NetMatrixCell>()
+        nets.forEach { net ->
+            val connectedPorts = net.connections.map { "${it.refDes}.${it.pinNumber}" }.toSet()
+            matrixRows.add(NetMatrixCell(
+                netName = net.name,
+                connectedPorts = connectedPorts,
+                net = net
+            ))
+        }
+
+        // 3. Колонка с именами цепей
+        val netNameCol = TableColumn<NetMatrixCell, String>("Цепь")
         netNameCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.netName) }
         netNameCol.prefWidth = 150.0
+        netNameCol.isSortable = false
+        matrixTable.columns.add(netNameCol)
 
-        sortedPortRefs.forEach { portRef ->
+        // 4. Колонки для используемых портов
+        sortedPorts.forEach { portRef ->
             val col = TableColumn<NetMatrixCell, Boolean>(portRef)
-            col.setCellValueFactory { javafx.beans.property.SimpleBooleanProperty(it.value.connected) }
             col.prefWidth = 80.0
+            col.isSortable = false
+            col.setCellValueFactory { cellData ->
+                javafx.beans.property.SimpleBooleanProperty(cellData.value.connectedPorts.contains(portRef))
+            }
             col.cellFactory = javafx.util.Callback {
-                javafx.scene.control.TableCell<NetMatrixCell, Boolean>().apply {
-                    val checkBox = CheckBox()
-                    graphic = checkBox
-                    // Обновляем checkbox при переиспользовании ячейки
-                    itemProperty().addListener { _, _, newVal ->
-                        checkBox.isSelected = newVal ?: false
-                    }
-                    checkBox.selectedProperty().addListener { _, _, newVal ->
-                        val cellData = tableRow.item
-                        if (cellData != null) {
-                            val updatedNets = nets.toMutableList()
-                            val netIndex = updatedNets.indexOf(cellData.net)
-                            if (netIndex >= 0) {
-                                val currentNet = updatedNets[netIndex]
-                                val existingConn = currentNet.connections.find {
-                                    it.refDes == cellData.refDes && it.pinNumber == cellData.pinNumber
-                                }
-                                val newConns = if (newVal) {
-                                    if (existingConn == null) currentNet.connections + NetConnection(cellData.refDes, cellData.pinNumber)
-                                    else currentNet.connections
-                                } else {
-                                    currentNet.connections.filter { it != existingConn }
-                                }
-                                updatedNets[netIndex] = currentNet.copy(connections = newConns.toList())
-                                nets.setAll(updatedNets)
-                                markDirty()
+                object : TableCell<NetMatrixCell, Boolean>() {
+                    private val checkBox = CheckBox().apply {
+                        setOnAction {
+                            val rowItem = tableRow.item
+                            if (rowItem != null) {
+                                toggleConnection(rowItem.net, portRef, isSelected)
                             }
+                        }
+                    }
+                    override fun updateItem(item: Boolean?, empty: Boolean) {
+                        super.updateItem(item, empty)
+                        if (empty || item == null) {
+                            graphic = null
+                        } else {
+                            graphic = checkBox
+                            checkBox.isSelected = item
                         }
                     }
                 }
@@ -378,6 +373,34 @@ class NetWindow : ProjectAware {
         }
 
         matrixTable.items = matrixRows
+    }
+
+    private fun toggleConnection(net: Net, portRef: String, connected: Boolean) {
+        val parts = portRef.split(".", limit = 2)
+        val refDes = parts[0]
+        val pinNumber = parts.getOrElse(1) { "" }
+
+        val netIndex = nets.indexOfFirst { it.name == net.name }
+        if (netIndex < 0) return
+
+        val currentNet = nets[netIndex]
+        val existingConn = currentNet.connections.find { it.refDes == refDes && it.pinNumber == pinNumber }
+
+        val newConnections = if (connected) {
+            if (existingConn == null) currentNet.connections + NetConnection(refDes, pinNumber)
+            else currentNet.connections
+        } else {
+            currentNet.connections.filter { it != existingConn }
+        }
+
+        nets[netIndex] = currentNet.copy(connections = newConnections)
+
+        // Обновляем таблицу соединений (вкладка 1), если эта цепь выбрана
+        if (selectedNetIndex == netIndex) {
+            connectionsList.setAll(newConnections)
+        }
+
+        markDirty()
     }
 
     private fun exportCsv() {
@@ -495,11 +518,9 @@ class NetWindow : ProjectAware {
 }
 
 /** Ячейка матрицы связей. */
+/** Ячейка матрицы связей. Одна строка = одна цепь. */
 data class NetMatrixCell(
     val netName: String,
-    val portRef: String,
-    val refDes: String,
-    val pinNumber: String,
-    val connected: Boolean,
+    val connectedPorts: Set<String>, // например, setOf("DD2.1", "R5.1")
     val net: Net
 )
