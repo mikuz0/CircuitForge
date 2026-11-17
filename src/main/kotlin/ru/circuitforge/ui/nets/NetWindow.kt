@@ -39,6 +39,8 @@ class NetWindow : ProjectAware {
     // UI — Toolbar
     private val addNetButton = Button(I18n.tr("net.btn.add"))
     private val deleteNetButton = Button(I18n.tr("net.btn.delete"))
+    private val renameNetButton = Button(I18n.tr("net.btn.rename"))  // <-- ДОБАВИТЬ
+    private val mergeNetsButton = Button(I18n.tr("net.btn.merge"))  // <-- ДОБАВИТЬ
     private val exportCsvButton = Button(I18n.tr("net.btn.export.csv"))
     private val projectLabel = Label("Project: <not opened>")
 
@@ -86,7 +88,7 @@ class NetWindow : ProjectAware {
 
     private fun createToolbar(): HBox {
         projectLabel.style = "-fx-font-family: monospace; -fx-text-fill: #555;"
-        return HBox(10.0, addNetButton, deleteNetButton, exportCsvButton, projectLabel).apply {
+        return HBox(10.0, addNetButton, renameNetButton, mergeNetsButton, deleteNetButton, exportCsvButton, projectLabel).apply {
             alignment = Pos.CENTER_LEFT
             padding = Insets(8.0)
             style = "-fx-background-color: #f5f5f5; -fx-border-color: #dddddd; -fx-border-width: 0 0 1 0;"
@@ -112,6 +114,8 @@ class NetWindow : ProjectAware {
             style = "-fx-background-color: white; -fx-border-color: #ddd; -fx-border-width: 0 1 0 0;"
         }
         netListView.items = netNames
+        // Разрешаем выбирать несколько цепей (для объединения)
+        netListView.selectionModel.selectionMode = SelectionMode.MULTIPLE
 
         val rightPanel = VBox(10.0, connectionsLabel, connectionsTable,
             HBox(10.0, addConnectionButton, deleteConnectionButton).apply { alignment = Pos.CENTER_LEFT }
@@ -152,7 +156,16 @@ class NetWindow : ProjectAware {
         addNetButton.setOnAction { addNet() }
         deleteNetButton.setOnAction { deleteNet() }
         exportCsvButton.setOnAction { exportCsv() }
-
+        // ДОБАВЬ ЭТИ ДВЕ СТРОКИ, ЕСЛИ ИХ НЕТ:
+        renameNetButton.setOnAction { renameNet() }
+        mergeNetsButton.setOnAction { mergeNets() }
+// Включение/выключение кнопки "Объединить" при изменении выделения
+        netListView.selectionModel.selectedItems.addListener(
+            javafx.collections.ListChangeListener { change ->
+                val selectedCount = netListView.selectionModel.selectedItems.size
+                mergeNetsButton.isDisable = (selectedCount != 2)
+            }
+        )
         // Обработчики для соединений
         addConnectionButton.setOnAction { addConnection() }
         deleteConnectionButton.setOnAction { deleteConnection() }
@@ -161,7 +174,8 @@ class NetWindow : ProjectAware {
         revertButton.setOnAction { revertChanges() }
 
         netListView.selectionModel.selectedItemProperty().addListener { _, _, selectedNetName ->
-            if (selectedNetName != null) {
+            // Показываем соединения только если выбрана ровно ОДНА цепь
+            if (netListView.selectionModel.selectedItems.size == 1 && selectedNetName != null) {
                 val net = nets.find { it.name == selectedNetName }
                 if (net != null) {
                     selectedNetIndex = nets.indexOf(net)
@@ -169,10 +183,18 @@ class NetWindow : ProjectAware {
                     connectionsList.setAll(net.connections.toList())
                 }
             } else {
-                connectionsLabel.text = I18n.tr("net.label.connections.for")
+                // Если ничего не выбрано или выбрано несколько цепей — очищаем правую панель
+                if (netListView.selectionModel.selectedItems.isEmpty()) {
+                    connectionsLabel.text = I18n.tr("net.label.connections.for")
+                } else {
+                    // Если выбрано > 1, можно написать подсказку или оставить пустым
+                    connectionsLabel.text = "Выбрано несколько цепей"
+                }
                 connectionsList.clear()
+                selectedNetIndex = -1
             }
         }
+
     }
 
     private fun addNet() {
@@ -515,6 +537,92 @@ class NetWindow : ProjectAware {
     }
 
     override fun getStage(): Stage = stage
+    private fun renameNet() {
+        val selectedNetName = netListView.selectionModel.selectedItem ?: return
+        val dialog = TextInputDialog(selectedNetName)
+        dialog.title = I18n.tr("net.dialog.rename")
+        dialog.headerText = I18n.tr("net.dialog.rename.header")
+        dialog.contentText = I18n.tr("net.dialog.net.name")
+
+        val result = dialog.showAndWait()
+        if (result.isPresent && result.get().isNotBlank()) {
+            val newName = result.get().trim()
+            if (newName == selectedNetName) return
+
+            if (nets.any { it.name == newName }) {
+                UiUtils.errorAlert(I18n.tr("common.alert.error"),
+                    "Цепь с именем '$newName' уже существует. Используйте 'Объединить' для слияния.")
+                return
+            }
+
+            val netIndex = nets.indexOfFirst { it.name == selectedNetName }
+            if (netIndex >= 0) {
+                nets[netIndex] = nets[netIndex].copy(name = newName)
+                val nameIndex = netNames.indexOf(selectedNetName)
+                if (nameIndex >= 0) netNames[nameIndex] = newName
+                netListView.selectionModel.select(newName)
+                refreshMatrix()
+                markDirty()
+                logger.info("Net renamed: $selectedNetName -> $newName")
+            }
+        }
+    }
+
+    private fun mergeNets() {
+        val selectedItems = netListView.selectionModel.selectedItems
+        if (selectedItems.size != 2) return
+
+        val net1Name = selectedItems[0]
+        val net2Name = selectedItems[1]
+
+        // Диалог выбора, какое имя оставить
+        val dialog = ChoiceDialog(net1Name, listOf(net1Name, net2Name))
+        dialog.title = I18n.tr("net.dialog.merge")
+        dialog.headerText = I18n.tr("net.dialog.merge.header")
+        dialog.contentText = "Выберите имя для объединенной цепи:"
+
+        val result = dialog.showAndWait()
+        if (result.isPresent) {
+            val targetName = result.get()
+            val sourceName = if (targetName == net1Name) net2Name else net1Name
+
+            val targetIndex = nets.indexOfFirst { it.name == targetName }
+            val sourceIndex = nets.indexOfFirst { it.name == sourceName }
+
+            if (targetIndex >= 0 && sourceIndex >= 0) {
+                val targetNet = nets[targetIndex]
+                val sourceNet = nets[sourceIndex]
+
+                // Объединяем соединения и убираем дубликаты
+                val mergedConnections = (targetNet.connections + sourceNet.connections).distinct()
+
+                // Обновляем целевую цепь
+                nets[targetIndex] = targetNet.copy(connections = mergedConnections)
+
+                // Удаляем исходную цепь
+                nets.removeAt(sourceIndex)
+                netNames.remove(sourceName)
+
+                // Если выбранная цепь была исходной — переключаемся на целевую
+                if (selectedNetIndex == sourceIndex) {
+                    selectedNetIndex = targetIndex
+                } else if (selectedNetIndex > sourceIndex) {
+                    selectedNetIndex-- // Сдвиг индекса после удаления
+                }
+
+                // Обновляем UI
+                netListView.selectionModel.clearSelection()
+                netListView.selectionModel.select(targetName)
+                connectionsList.setAll(mergedConnections)
+
+                refreshMatrix()
+                markDirty()
+                logger.info("Nets merged: $net1Name + $net2Name -> $targetName")
+            }
+        }
+    }
+
+
 }
 
 /** Ячейка матрицы связей. */
