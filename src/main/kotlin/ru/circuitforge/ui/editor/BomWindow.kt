@@ -90,18 +90,92 @@ class BomWindow : ProjectAware {
         val refDesCol = TableColumn<BomRow, String>("Поз. обозначение")
         refDesCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refDes) }
         refDesCol.prefWidth = 150.0
-        refDesCol.cellFactory = javafx.util.Callback { _ -> TextFieldTableCell<BomRow, String>() }
+        refDesCol.cellFactory = javafx.util.Callback { _ ->
+            object : TableCell<BomRow, String>() {
+                private val textField = TextField()
+                init {
+                    textField.setOnAction {
+                        commitEdit(textField.text)
+                    }
+                    textField.focusedProperty().addListener { _, _, isFocused ->
+                        if (!isFocused) commitEdit(textField.text)
+                    }
+                }
+                override fun startEdit() {
+                    super.startEdit()
+                    textField.text = item ?: ""
+                    graphic = textField
+                    text = null
+                    textField.requestFocus()
+                    textField.selectAll()
+                }
+                override fun cancelEdit() {
+                    super.cancelEdit()
+                    text = item
+                    graphic = null
+                }
+                override fun updateItem(item: String?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    if (empty || item == null) {
+                        text = null
+                        graphic = null
+                    } else if (isEditing) {
+                        textField.text = item
+                        graphic = textField
+                        text = null
+                    } else {
+                        text = item
+                        graphic = null
+                    }
+                }
+            }
+        }
         refDesCol.setOnEditCommit { event ->
             val row = event.rowValue
             val newRefDes = event.newValue?.trim() ?: ""
-            if (newRefDes.isNotBlank()) {
-                val index = bomRows.indexOf(row)
-                if (index >= 0) {
-                    bomRows[index] = row.copy(refDes = newRefDes)
-                    markDirty()
+            if (newRefDes.isBlank()) {
+                tableView.refresh()
+                return@setOnEditCommit
+            }
+
+            // Валидация префикса: извлечь префикс (все символы кроме финальных цифр)
+            val prefixRegex = Regex("^(.*[^0-9])([0-9]+)$")
+            val matchResult = prefixRegex.matchEntire(newRefDes)
+            if (matchResult == null) {
+                if (row.refPrefix.isNotBlank()) {
+                    UiUtils.errorAlert(
+                        I18n.tr("common.alert.error") ?: "Ошибка",
+                        "Поз. обозначение должно содержать префикс '" + row.refPrefix + "' и номер."
+                    )
+                    tableView.refresh()
+                    return@setOnEditCommit
                 }
             } else {
+                val extractedPrefix = matchResult.groupValues[1]
+                if (extractedPrefix != row.refPrefix) {
+                    UiUtils.errorAlert(
+                        I18n.tr("common.alert.error") ?: "Ошибка",
+                        "Префикс должен быть '" + row.refPrefix + "', а не '" + extractedPrefix + "'."
+                    )
+                    tableView.refresh()
+                    return@setOnEditCommit
+                }
+            }
+
+            // Уникальность RefDes
+            if (bomRows.map { it.refDes }.filter { it != row.refDes }.contains(newRefDes)) {
+                UiUtils.errorAlert(
+                    I18n.tr("common.alert.error") ?: "Ошибка",
+                    "Поз. обозначение '" + newRefDes + "' уже существует."
+                )
                 tableView.refresh()
+                return@setOnEditCommit
+            }
+
+            val index = bomRows.indexOf(row)
+            if (index >= 0) {
+                bomRows[index] = row.copy(refDes = newRefDes)
+                markDirty()
             }
         }
 
