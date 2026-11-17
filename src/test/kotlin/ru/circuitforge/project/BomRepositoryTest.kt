@@ -23,7 +23,6 @@ class BomRepositoryTest {
 
         val bom = BomRepository.load(projectDir)
 
-        // schemaVersion по умолчанию = 1, items должен быть пустым
         assertEquals(1, bom.schemaVersion)
         assertTrue(bom.items.isEmpty())
     }
@@ -58,11 +57,11 @@ class BomRepositoryTest {
     fun `testInitFromComponents`() {
         val projectDir = setupProjectDir()
 
-        // Создаём 2 компонента
+        // Создаём 2 компонента (БЕЗ поля slug)
         val comp1Path = projectDir.resolve("components").resolve("resistor-0603.cfcomp")
         val comp1 = Component(
             schemaVersion = 1,
-            slug = "resistor-0603",
+            // slug = "resistor-0603", // <--- УДАЛЕНО
             name = "Resistor 0603",
             description = "Generic 0603 resistor",
             refPrefix = "R",
@@ -73,7 +72,7 @@ class BomRepositoryTest {
         val comp2Path = projectDir.resolve("components").resolve("capacitor-10uf.cfcomp")
         val comp2 = Component(
             schemaVersion = 1,
-            slug = "capacitor-10uf",
+            // slug = "capacitor-10uf", // <--- УДАЛЕНО
             name = "Capacitor 10uF",
             description = "Electrolytic capacitor",
             refPrefix = "C",
@@ -84,7 +83,7 @@ class BomRepositoryTest {
         val bomDoc = BomRepository.initFromComponents(projectDir)
 
         assertEquals(2, bomDoc.items.size)
-        // Проверяем, что есть элементы с правильными refPrefix и componentSlug
+        // Проверяем, что есть элементы с правильными componentSlug (именами файлов)
         val rItem = bomDoc.items.find { it.componentSlug == "resistor-0603" }
         val cItem = bomDoc.items.find { it.componentSlug == "capacitor-10uf" }
         assertNotNull(rItem, "Должен быть элемент с slug resistor-0603")
@@ -106,26 +105,21 @@ class BomRepositoryTest {
 
         BomRepository.save(projectDir, bomDoc)
 
-        // Читаем JSON напрямую и проверяем формат
         val bomPath = projectDir.resolve("bom.json")
         val jsonContent = Files.readString(bomPath)
         val json = Json { ignoreUnknownKeys = true }
 
-        // Проверяем, что schemaVersion = 1
         val parsed = json.decodeFromString(BomDocument.serializer(), jsonContent)
         assertEquals(1, parsed.schemaVersion)
         assertEquals(1, parsed.items.size)
 
-        // Проверяем, что все ключи на месте
         val item = parsed.items[0]
         assertEquals(1, item.number)
         assertEquals("R1", item.refDes)
         assertEquals("resistor-0603", item.componentSlug)
         assertEquals("10k", item.comment)
 
-        // Проверяем, что JSON prettyPrint (содержит переносы строк и отступы)
         assertTrue(jsonContent.contains("\n"), "JSON должен быть отформатирован с переносами")
-        // Ключи, которые точно есть (не default values)
         assertTrue(jsonContent.contains("\"items\""), "Ключ items должен быть в JSON")
         assertTrue(jsonContent.contains("\"number\""), "Ключ number должен быть в JSON")
         assertTrue(jsonContent.contains("\"refDes\""), "Ключ refDes должен быть в JSON")

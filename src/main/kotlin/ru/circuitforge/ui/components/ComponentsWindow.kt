@@ -16,6 +16,7 @@ import ru.circuitforge.ui.common.UiUtils
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.Executors
+import javafx.scene.control.cell.TextFieldTableCell
 
 private const val CFCOMP_EXT = ".cfcomp"
 
@@ -212,21 +213,168 @@ class ComponentsWindow : ProjectAware {
 
     /** Настраивает таблицу портов. */
     private fun setupPortTable() {
+        portTable.isEditable = true
+
+        // Колонка # (номер, не редактируется)
         val numberCol = TableColumn<Port, String>(I18n.tr("components.col.number"))
         numberCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.number.toString()) }
         numberCol.prefWidth = 50.0
+        numberCol.isEditable = false
 
+        // Колонка Pin#
         val pinCol = TableColumn<Port, String>(I18n.tr("components.col.pin"))
         pinCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.pinNumber) }
         pinCol.prefWidth = 100.0
+        pinCol.cellFactory = javafx.util.Callback { _ ->
+            object : TableCell<Port, String>() {
+                private val textField = TextField()
+                init {
+                    textField.setOnAction {
+                        commitEdit(textField.text)
+                    }
+                    textField.focusedProperty().addListener { _, _, isFocused ->
+                        if (!isFocused) commitEdit(textField.text)
+                    }
+                }
+                override fun startEdit() {
+                    super.startEdit()
+                    textField.text = item ?: ""
+                    graphic = textField
+                    text = null
+                    textField.requestFocus()
+                    textField.selectAll()
+                }
+                override fun cancelEdit() {
+                    super.cancelEdit()
+                    text = item
+                    graphic = null
+                }
+                override fun updateItem(item: String?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    if (empty || item == null) {
+                        text = null
+                        graphic = null
+                    } else if (isEditing) {
+                        textField.text = item
+                        graphic = textField
+                        text = null
+                    } else {
+                        text = item
+                        graphic = null
+                    }
+                }
+            }
+        }
+        pinCol.setOnEditCommit { event ->
+            val port = event.rowValue
+            val newPin = event.newValue?.trim() ?: ""
+            if (newPin.isBlank()) {
+                UiUtils.errorAlert(I18n.tr("common.alert.error"), "Номер пина не может быть пустым")
+                portTable.refresh()
+            } else {
+                val index = portList.indexOf(port)
+                if (index >= 0) {
+                    portList[index] = port.copy(pinNumber = newPin)
+                    markDirty()
+                }
+            }
+        }
 
+        // Колонка Name
         val nameCol = TableColumn<Port, String>(I18n.tr("components.col.port.name"))
         nameCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.name) }
         nameCol.prefWidth = 150.0
+        nameCol.cellFactory = javafx.util.Callback { _ ->
+            object : TableCell<Port, String>() {
+                private val textField = TextField()
+                init {
+                    textField.setOnAction { commitEdit(textField.text) }
+                    textField.focusedProperty().addListener { _, _, isFocused ->
+                        if (!isFocused) commitEdit(textField.text)
+                    }
+                }
+                override fun startEdit() {
+                    super.startEdit()
+                    textField.text = item ?: ""
+                    graphic = textField
+                    text = null
+                    textField.requestFocus()
+                    textField.selectAll()
+                }
+                override fun cancelEdit() {
+                    super.cancelEdit()
+                    text = item
+                    graphic = null
+                }
+                override fun updateItem(item: String?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    if (empty || item == null) {
+                        text = null; graphic = null
+                    } else if (isEditing) {
+                        textField.text = item; graphic = textField; text = null
+                    } else {
+                        text = item; graphic = null
+                    }
+                }
+            }
+        }
+        nameCol.setOnEditCommit { event ->
+            val port = event.rowValue
+            val newName = event.newValue?.trim() ?: ""
+            val index = portList.indexOf(port)
+            if (index >= 0) {
+                portList[index] = port.copy(name = newName)
+                markDirty()
+            }
+        }
 
+        // Колонка Description
         val descCol = TableColumn<Port, String>(I18n.tr("components.col.port.description"))
         descCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.description) }
         descCol.prefWidth = 200.0
+        descCol.cellFactory = javafx.util.Callback { _ ->
+            object : TableCell<Port, String>() {
+                private val textField = TextField()
+                init {
+                    textField.setOnAction { commitEdit(textField.text) }
+                    textField.focusedProperty().addListener { _, _, isFocused ->
+                        if (!isFocused) commitEdit(textField.text)
+                    }
+                }
+                override fun startEdit() {
+                    super.startEdit()
+                    textField.text = item ?: ""
+                    graphic = textField
+                    text = null
+                    textField.requestFocus()
+                    textField.selectAll()
+                }
+                override fun cancelEdit() {
+                    super.cancelEdit()
+                    text = item
+                    graphic = null
+                }
+                override fun updateItem(item: String?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    if (empty || item == null) {
+                        text = null; graphic = null
+                    } else if (isEditing) {
+                        textField.text = item; graphic = textField; text = null
+                    } else {
+                        text = item; graphic = null
+                    }
+                }
+            }
+        }
+        descCol.setOnEditCommit { event ->
+            val port = event.rowValue
+            val newDesc = event.newValue?.trim() ?: ""
+            val index = portList.indexOf(port)
+            if (index >= 0) {
+                portList[index] = port.copy(description = newDesc)
+                markDirty()
+            }
+        }
 
         portTable.columns.setAll(numberCol, pinCol, nameCol, descCol)
         portTable.items = portList
@@ -280,45 +428,67 @@ class ComponentsWindow : ProjectAware {
         }
         if (!validateRefPrefix(refPrefix)) return
 
-        val task = object : javafx.concurrent.Task<Unit>() {
-            override fun call() {
+        val originalSlug = editingComponentSlug
+
+        val task = object : javafx.concurrent.Task<Pair<String, Boolean>>() {
+            override fun call(): Pair<String, Boolean> {
+                var isUsedInBom = false
+                var newSlug = originalSlug
+
                 projectPath?.let { dir ->
-                    val originalSlug = editingComponentSlug
+                    // 1. Проверяем, используется ли компонент в BOM
+                    val bomDoc = BomRepository.load(dir)
+                    isUsedInBom = bomDoc.items.any { it.componentSlug == originalSlug }
+
+                    // 2. Сохраняем компонент (без блокировок)
                     if (originalSlug != null) {
-                        // Обновление
-                        ComponentRepository.saveComponent(
+                        newSlug = ComponentRepository.saveComponent(
                             dir, originalSlug, name, description, refPrefix, portList.toList()
                         )
                         logger.info("Component updated: $name")
                     } else {
-                        // Создание
-                        ComponentRepository.createComponent(
+                        newSlug = ComponentRepository.createComponent(
                             dir, name, description, refPrefix, portList.toList()
                         )
                         logger.info("Component created: $name")
                     }
                 }
+                return Pair(newSlug ?: "", isUsedInBom)
             }
-        }
 
-        task.setOnSucceeded {
-            // Перезагружаем список компонентов
-            projectPath?.let { dir ->
-                componentList.setAll(ComponentRepository.listComponents(dir))
+            override fun succeeded() {
+                val (slug, usedInBom) = value
+                editingComponentSlug = slug
+
+                // Перезагружаем список компонентов
+                projectPath?.let { dir ->
+                    componentList.setAll(ComponentRepository.listComponents(dir))
+                }
+                clearComponentForm()
+                portList.clear()
+                originalPortList.clear()
+
+                // Если компонент используется в BOM — показываем предупреждение
+                if (usedInBom) {
+                    val alert = javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.WARNING)
+                    alert.title = "Внимание"
+                    alert.headerText = "Компонент используется в BOM"
+                    alert.contentText = "Изменения сохранены.\n\n" +
+                            "Пожалуйста, проверьте перечень элементов (ПЭ3) и обновите связи, " +
+                            "если префикс или имя компонента изменились."
+                    alert.showAndWait()
+                }
+
+                logger.info("Component saved successfully")
             }
-            clearComponentForm()
-            portList.clear()
-            originalPortList.clear()
-            isDirty = false
-            logger.info("Component saved successfully")
-        }
-        task.setOnFailed {
-            UiUtils.errorAlert(I18n.tr("components.alert.save.failed"), task.exception?.message ?: I18n.tr("common.alert.unknown.error"))
-            logger.error("Failed to save component", task.exception)
+
+            override fun failed() {
+                UiUtils.errorAlert(I18n.tr("components.alert.save.failed"), exception?.message ?: I18n.tr("common.alert.unknown.error"))
+                logger.error("Failed to save component", exception)
+            }
         }
         executor.submit(task)
     }
-
     /** Удаляет выбранный компонент. */
     private fun deleteComponent() {
         val selected = componentTable.selectionModel.selectedItem ?: return

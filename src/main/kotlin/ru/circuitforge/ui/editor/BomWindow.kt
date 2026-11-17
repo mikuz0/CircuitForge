@@ -1,14 +1,11 @@
 package ru.circuitforge.ui.editor
 
 import javafx.collections.FXCollections
-import javafx.collections.transformation.SortedList
-import javafx.event.EventHandler
 import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.*
-import javafx.scene.input.KeyCode
-import javafx.scene.input.KeyEvent
+import javafx.scene.control.cell.TextFieldTableCell
 import javafx.scene.layout.*
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
@@ -16,18 +13,12 @@ import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
-import javafx.util.Callback
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
+import java.util.UUID
 import java.util.concurrent.Executors
 
-private const val CFCOMP_EXT = ".cfcomp"
-
 /**
- * Полноформатное окно редактора ПЭ3 (BOM).
- * Содержит таблицу с колонками #, RefDes, Component, Comment.
- * Поддерживает Add/Duplicate/Delete/Save/Revert, dirty tracking, горячие клавиши.
+ * Полноценное окно редактора ПЭ3 (BOM).
  */
 class BomWindow : ProjectAware {
     private val logger = LoggerFactory.getLogger(BomWindow::class.java)
@@ -38,414 +29,248 @@ class BomWindow : ProjectAware {
 
     private var projectPath: Path? = null
 
-    // Данные
-    private val bomItems = FXCollections.observableArrayList<BomItem>()
-    private var savedSnapshot: String = "" // Для dirty tracking
+    private val bomRows = FXCollections.observableArrayList<BomRow>()
+    private var savedSnapshot: String = ""
 
-    // UI элементы
-    private val tableView = TableView<BomItem>()
-
-    // Toolbar кнопки
-    private val addButton = Button(I18n.tr("bom.btn.add"))
-    private val duplicateButton = Button(I18n.tr("bom.btn.duplicate"))
-    private val deleteButton = Button(I18n.tr("bom.btn.delete"))
-    private val saveButton = Button(I18n.tr("bom.btn.save"))
-    private val revertButton = Button(I18n.tr("bom.btn.revert"))
-    private val closeButton = Button(I18n.tr("bom.btn.close"))
-
-    // Форма для редактирования выбранной строки
-    private val refDesField = TextField()
-    private val commentField = TextField()
+    private val tableView = TableView<BomRow>()
+    private val addButton = Button(I18n.tr("bom.btn.add") ?: "Добавить элемент")
+    private val duplicateButton = Button(I18n.tr("bom.btn.duplicate") ?: "Дублировать")
+    private val deleteButton = Button(I18n.tr("bom.btn.delete") ?: "Удалить")
+    private val saveButton = Button(I18n.tr("bom.btn.save") ?: "Сохранить")
+    private val revertButton = Button(I18n.tr("bom.btn.revert") ?: "Отменить")
+    private val closeButton = Button(I18n.tr("bom.btn.close") ?: "Закрыть")
+    private val statusLabel = Label("")
 
     init {
-        stage.title = I18n.tr("bom.window.title")
+        stage.title = I18n.tr("bom.window.title") ?: "BOM Editor (ПЭ3)"
         setupTableView()
         setupToolbar()
-        setupHotKeys()
-        stage.scene = Scene(createRoot(), 900.0, 600.0)
+        stage.scene = Scene(createRoot(), 1000.0, 650.0)
     }
 
-    /** Создаёт корневой контейнер. */
     private fun createRoot(): BorderPane {
         val root = BorderPane()
         root.top = createToolbar()
-        root.center = createTablePanel()
-        root.bottom = createFormPanel()
+        root.center = tableView
+        root.bottom = HBox(10.0, saveButton, revertButton, statusLabel).apply {
+            alignment = Pos.CENTER_LEFT
+            padding = Insets(8.0)
+            style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
+        }
         return root
     }
 
-    /** Создаёт панель инструментов. */
     private fun createToolbar(): HBox {
-        val toolbar = HBox(10.0, addButton, duplicateButton, deleteButton, saveButton, revertButton, closeButton).apply {
+        return HBox(10.0, addButton, duplicateButton, deleteButton, closeButton).apply {
             alignment = Pos.CENTER_LEFT
             padding = Insets(8.0)
-            style = "-fx-background-color: #f5f5f5; -fx-border-color: #dddddd; -fx-border-width: 0 0 1 0;"
-        }
-        return toolbar
-    }
-
-    /** Создаёт панель таблицы. */
-    private fun createTablePanel(): VBox {
-        return VBox(0.0, tableView).apply {
-            style = "-fx-background-color: white;"
-            VBox.setVgrow(tableView, Priority.ALWAYS)
+            style = "-fx-background-color: #f5f5f5; -fx-border-color: #ddd; -fx-border-width: 0 0 1 0;"
         }
     }
 
-    /** Создаёт панель формы редактирования. */
-    private fun createFormPanel(): VBox {
-        val grid = GridPane()
-        grid.hgap = 10.0
-        grid.vgap = 8.0
-        grid.padding = Insets(10.0)
-        grid.style = "-fx-background-color: #fafafa; -fx-border-color: #dddddd; -fx-border-width: 1 0 0 0;"
-
-        val refDesLabel = Label(I18n.tr("bom.label.ref.des"))
-        val commentLabel = Label(I18n.tr("bom.label.comment"))
-        GridPane.setConstraints(refDesLabel, 0, 0)
-        GridPane.setConstraints(refDesField, 1, 0)
-        GridPane.setConstraints(commentLabel, 0, 1)
-        GridPane.setConstraints(commentField, 1, 1)
-
-        grid.children.addAll(refDesLabel, refDesField, commentLabel, commentField)
-
-        // Кнопка сохранения
-        val saveEditButton = Button(I18n.tr("bom.btn.save.selected"))
-        saveEditButton.onAction = EventHandler { saveSelectedEdit() }
-
-        return VBox(10.0, Label(I18n.tr("bom.label.edit.selected")), grid, saveEditButton).apply {
-            padding = Insets(10.0)
-        }
-    }
-
-    /** Настраивает TableView с колонками. */
-    private fun setupTableView() {
-        // Колонка # — порядковый номер (readonly)
-        val numberCol = TableColumn<BomItem, String>(I18n.tr("bom.col.number"))
-        numberCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.number.toString()) }
-        numberCol.isEditable = false
-        numberCol.prefWidth = 50.0
-
-        // Колонка RefDes — позиционное обозначение (readonly, редактируем через форму)
-        val refDesCol = TableColumn<BomItem, String>(I18n.tr("bom.col.ref.des"))
-        refDesCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refDes) }
-        refDesCol.prefWidth = 200.0
-
-        // Колонка Component — наименование из библиотеки (readonly)
-        val componentCol = TableColumn<BomItem, String>(I18n.tr("bom.col.component"))
-        componentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(resolveComponentName(it.value.componentSlug)) }
-        componentCol.isEditable = false
-        componentCol.prefWidth = 250.0
-
-        // Колонка Comment — комментарий (readonly, редактируем через форму)
-        val commentCol = TableColumn<BomItem, String>(I18n.tr("bom.col.comment"))
-        commentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.comment) }
-        commentCol.prefWidth = 300.0
-
-        tableView.columns.setAll(numberCol, refDesCol, componentCol, commentCol)
-        tableView.items = SortedList(bomItems)
-
-        // Выделение строки → заполнение формы
-        tableView.selectionModel.selectedItemProperty().addListener { _, _, new ->
-            if (new != null) {
-                refDesField.text = new.refDes
-                commentField.text = new.comment
-            }
-        }
-    }
-
-    /** Разрешает имя компонента по slug. */
-    private fun resolveComponentName(slug: String): String {
-        if (slug.isBlank()) return I18n.tr("bom.placeholder.not.found")
-        projectPath?.let { dir ->
-            val compPath = dir.resolve("components").resolve("${slug}$CFCOMP_EXT")
-            if (Files.exists(compPath)) {
-                try {
-                    val comp = ComponentRepository.load(compPath)
-                    return comp.name
-                } catch (e: Exception) {
-                    logger.warn("Failed to load component $slug", e)
-                }
-            }
-        }
-        return I18n.tr("bom.placeholder.not.found.detail", slug)
-    }
-
-    /** Создаёт и подписывает toolbar. */
     private fun setupToolbar() {
-        addButton.setOnAction { showAddItemForm() }
+        addButton.setOnAction { showAddItemDialog() }
         duplicateButton.setOnAction { duplicateRow() }
         deleteButton.setOnAction { deleteRow() }
         saveButton.setOnAction { saveBom() }
         revertButton.setOnAction { revertChanges() }
-        closeButton.setOnAction { handleWindowClosing() }
+        closeButton.setOnAction { stage.close() }
     }
 
-    /** Настраивает горячие клавиши. */
-    private fun setupHotKeys() {
-        stage.sceneProperty().addListener { _, _, newScene ->
-            newScene?.onKeyPressed = EventHandler { event: KeyEvent -> handleHotKey(event) }
-        }
-    }
+    private fun setupTableView() {
+        tableView.isEditable = true
 
-    /** Обработчик горячих клавиш. */
-    private fun handleHotKey(event: KeyEvent) {
-        when {
-            event.code == KeyCode.S && event.isControlDown -> { saveBom(); event.consume() }
-            event.code == KeyCode.D && event.isControlDown -> { duplicateRow(); event.consume() }
-            event.code == KeyCode.DELETE -> { deleteRow(); event.consume() }
-        }
-    }
+        // Колонка # (readonly)
+        val numberCol = TableColumn<BomRow, String>("#")
+        numberCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.number.toString()) }
+        numberCol.isEditable = false
+        numberCol.prefWidth = 50.0
 
-    /** Проверяет, есть ли несохранённые изменения. */
-    private fun isDirty(): Boolean {
-        return serializeCurrentState() != savedSnapshot
-    }
-
-    /** Сериализует текущее состояние BOM в строку. */
-    private fun serializeCurrentState(): String {
-        return bomItems.map { "${it.number}|${it.refDes}|${it.componentSlug}|${it.comment}" }.joinToString(";")
-    }
-
-    /** Помечает состояние как изменённое. */
-    private fun markDirty() {
-        // Можно добавить визуальный индикатор изменений
-    }
-
-    /** Показывает диалог выбора компонента для добавления элемента BOM. */
-    private fun showAddItemForm() {
-        val components = projectPath?.let { dir ->
-            ComponentRepository.listComponents(dir)
-        } ?: emptyList()
-
-        if (components.isEmpty()) {
-            UiUtils.errorAlert(I18n.tr("bom.alert.no.components"), I18n.tr("bom.alert.no.components.text"))
-            return
-        }
-
-        val comboBox = ComboBox<ComponentSummary>().apply {
-            items.setAll(components)
-            @Suppress("UNCHECKED_CAST")
-            cellFactory = Callback { _: ListView<ComponentSummary> ->
-                object : ListCell<ComponentSummary>() {
-                    override fun updateItem(item: ComponentSummary?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        text = if (empty || item == null) {
-                            null
-                        } else {
-                            "${item.name} (${item.refPrefix})"
-                        }
-                    }
+        // Колонка RefDes (редактируемая)
+        val refDesCol = TableColumn<BomRow, String>("Поз. обозначение")
+        refDesCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refDes) }
+        refDesCol.prefWidth = 150.0
+        refDesCol.cellFactory = javafx.util.Callback { _ -> TextFieldTableCell<BomRow, String>() }
+        refDesCol.setOnEditCommit { event ->
+            val row = event.rowValue
+            val newRefDes = event.newValue?.trim() ?: ""
+            if (newRefDes.isNotBlank()) {
+                val index = bomRows.indexOf(row)
+                if (index >= 0) {
+                    bomRows[index] = row.copy(refDes = newRefDes)
+                    markDirty()
                 }
-            } as Callback<ListView<ComponentSummary>, ListCell<ComponentSummary>>
-        }
-
-        val dialog = Dialog<ComponentSummary>()
-        dialog.title = I18n.tr("bom.dialog.add")
-        dialog.headerText = I18n.tr("bom.dialog.select.component")
-        dialog.dialogPane.buttonTypes.setAll(ButtonType.OK, ButtonType.CANCEL)
-
-        val grid = GridPane()
-        grid.hgap = 10.0
-        grid.vgap = 8.0
-        grid.padding = Insets(10.0)
-        GridPane.setConstraints(Label(I18n.tr("bom.dialog.choose.component")), 0, 0)
-        GridPane.setConstraints(comboBox, 1, 0)
-        grid.children.setAll(
-            Label(I18n.tr("bom.dialog.choose.component")), comboBox
-        )
-        dialog.dialogPane.content = grid
-
-        dialog.dialogPane.lookupButton(ButtonType.OK).disableProperty().bind(
-            comboBox.valueProperty().isNull()
-        )
-
-        val result = dialog.showAndWait()
-        if (result.isPresent && result.get() == ButtonType.OK) {
-            val selected = comboBox.value
-            if (selected != null) {
-                addItemFromComponent(selected)
+            } else {
+                tableView.refresh()
             }
         }
-    }
 
-    /** Добавляет элемент BOM на основе выбранного компонента. */
-    private fun addItemFromComponent(component: ComponentSummary) {
-        // Генерируем RefDes: берём refPrefix и ищем максимальный номер
-        val prefix = component.refPrefix.uppercase()
-        val existingRefs = bomItems.mapNotNull { item ->
-            val refDes = item.refDes
-            val numStr = refDes.dropWhile { !it.isDigit() }
-            val num = numStr.toIntOrNull() ?: return@mapNotNull null
-            prefix to num
+        // Колонка Component (readonly)
+        val componentCol = TableColumn<BomRow, String>("Компонент")
+        componentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.componentName) }
+        componentCol.isEditable = false
+        componentCol.prefWidth = 250.0
+
+        // Колонка Comment (редактируемая)
+        val commentCol = TableColumn<BomRow, String>("Комментарий")
+        commentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.comment) }
+        commentCol.prefWidth = 300.0
+        commentCol.cellFactory = javafx.util.Callback { _ -> TextFieldTableCell<BomRow, String>() }
+        commentCol.setOnEditCommit { event ->
+            val row = event.rowValue
+            val newComment = event.newValue ?: ""
+            val index = bomRows.indexOf(row)
+            if (index >= 0) {
+                bomRows[index] = row.copy(comment = newComment)
+                markDirty()
+            }
         }
-        val maxNum = existingRefs.maxOfOrNull { it.second } ?: 0
-        val newRefDes = "$prefix${maxNum + 1}"
 
-        val newItem = BomItem(
-            number = 0, // Будет пересчитан при сохранении
-            refDes = newRefDes,
-            componentSlug = component.slug,
-            comment = ""
-        )
-
-        bomItems.add(newItem)
-        markDirty()
+        tableView.columns.setAll(numberCol, refDesCol, componentCol, commentCol)
+        tableView.items = bomRows
     }
 
-    /** Сохраняет изменения из формы "Редактировать выбранное". */
-    private fun saveSelectedEdit() {
-        val selected = tableView.selectionModel.selectedItem ?: return
-        val newRefDes = refDesField.text.trim()
-        val newComment = commentField.text.trim()
-
-        // Валидация
-        if (newRefDes.isBlank()) {
-            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.required"))
+    private fun showAddItemDialog() {
+        val projectDir = projectPath ?: return
+        val components = ComponentRepository.listComponents(projectDir)
+        if (components.isEmpty()) {
+            UiUtils.errorAlert("Нет компонентов", "В проекте нет компонентов. Создайте их в редакторе компонентов.")
             return
         }
 
-        // Проверка уникальности RefDes
-        val refDesList = bomItems.map { it.refDes }
-        if (refDesList.filter { it == newRefDes }.size > 1) {
-            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.unique"))
-            return
+        val dialog = ChoiceDialog(components.first().name, components.map { it.name })
+        dialog.title = "Добавить элемент"
+        dialog.headerText = "Выберите компонент"
+        dialog.contentText = "Компонент:"
+
+        val result = dialog.showAndWait()
+        if (result.isPresent) {
+            val selectedName = result.get()
+            val comp = components.find { it.name == selectedName } ?: return
+
+            // Генерируем RefDes: prefix + maxNum + 1
+            val prefix = comp.refPrefix.uppercase()
+            val existingNums = bomRows.mapNotNull { row ->
+                if (row.refDes.startsWith(prefix)) {
+                    row.refDes.removePrefix(prefix).toIntOrNull()
+                } else null
+            }
+            val maxNum = existingNums.maxOrNull() ?: 0
+            val newRefDes = "$prefix${maxNum + 1}"
+
+            val newRow = BomRow(
+                bomnetId = UUID.randomUUID().toString(),
+                number = 0, // Пересчитается при сохранении
+                refDes = newRefDes,
+                componentId = comp.id,
+                componentName = comp.name,
+                comment = "",
+                refPrefix = prefix
+            )
+            bomRows.add(newRow)
+            markDirty()
+            logger.info("Added BOM item: $newRefDes (${comp.name})")
         }
-
-        // Обновляем строку
-        val updatedItem = selected.copy(refDes = newRefDes, comment = newComment)
-        val index = bomItems.indexOf(selected)
-        bomItems[index] = updatedItem
-
-        markDirty()
-        logger.info("BOM item updated: ${updatedItem.refDes}")
     }
 
-    /** Дублирует выбранную строку. */
     private fun duplicateRow() {
         val selected = tableView.selectionModel.selectedItem ?: return
-        val index = bomItems.indexOf(selected)
-
-        // Генерируем следующий RefDes
-        val prefix = selected.refDes.takeWhile { c -> c.isLetter() }.ifEmpty { "X" }
-        val existingRefs = bomItems.mapNotNull { item ->
-            val refDes = item.refDes
-            val numStr = refDes.dropWhile { !it.isDigit() }
-            val num = numStr.toIntOrNull() ?: return@mapNotNull null
-            prefix to num
+        val prefix = selected.refPrefix
+        val existingNums = bomRows.mapNotNull { row ->
+            if (row.refDes.startsWith(prefix)) {
+                row.refDes.removePrefix(prefix).toIntOrNull()
+            } else null
         }
-        val maxNum = existingRefs.maxOfOrNull { it.second } ?: 0
+        val maxNum = existingNums.maxOrNull() ?: 0
         val newRefDes = "$prefix${maxNum + 1}"
 
-        val duplicate = selected.copy(
+        val dup = selected.copy(
+            bomnetId = UUID.randomUUID().toString(),
             refDes = newRefDes,
             number = 0
         )
-
-        bomItems.add(index + 1, duplicate)
-        tableView.selectionModel.select(index + 1)
+        bomRows.add(dup)
         markDirty()
     }
 
-    /** Удаляет выбранную строку. */
     private fun deleteRow() {
         val selected = tableView.selectionModel.selectedItem ?: return
-        if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("bom.alert.delete.row"), I18n.tr("bom.alert.delete.row.text", selected.refDes))) return
-        bomItems.remove(selected)
+        if (!UiUtils.confirmAlert("Удалить?", null, "Удалить строку '${selected.refDes}'?")) return
+        bomRows.remove(selected)
         markDirty()
     }
 
-    /** Сохраняет BOM документ. */
     private fun saveBom() {
-        // Валидация: все RefDes должны быть заполнены и уникальны
-        val refDesList = bomItems.map { it.refDes }
+        val refDesList = bomRows.map { it.refDes }
         if (refDesList.any { it.isBlank() }) {
-            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.required"))
+            UiUtils.errorAlert("Ошибка", "Все RefDes должны быть заполнены.")
             return
         }
         if (refDesList.size != refDesList.toSet().size) {
-            UiUtils.errorAlert(I18n.tr("bom.alert.validation.error"), I18n.tr("bom.alert.ref.des.unique"))
+            UiUtils.errorAlert("Ошибка", "Все RefDes должны быть уникальны.")
             return
         }
 
         // Перенумерация #
-        val numberedItems = bomItems.mapIndexed { index, item ->
-            item.copy(number = index + 1)
-        }
+        val numberedRows = bomRows.mapIndexed { index, row -> row.copy(number = index + 1) }
 
         val task = object : javafx.concurrent.Task<Unit>() {
             override fun call() {
                 projectPath?.let { dir ->
-                    val bomDoc = BomDocument(schemaVersion = 1, items = numberedItems)
-                    BomRepository.save(dir, bomDoc)
+                    val items = numberedRows.map { row ->
+                        BomItem(
+                            bomnetId = row.bomnetId,
+                            number = row.number,
+                            refDes = row.refDes,
+                            componentId = row.componentId,
+                            comment = row.comment
+                        )
+                    }
+                    BomRepository.save(dir, BomDocument(schemaVersion = 1, items = items))
                     savedSnapshot = serializeCurrentState()
-                    logger.info("BOM saved successfully")
                 }
             }
         }
-
         task.setOnSucceeded {
-            val alert = Alert(Alert.AlertType.INFORMATION)
-            alert.title = I18n.tr("bom.alert.success")
-            alert.headerText = null
-            alert.contentText = I18n.tr("bom.alert.saved")
-            alert.showAndWait()
+            statusLabel.text = "Сохранено"
+            logger.info("BOM saved")
         }
         task.setOnFailed {
-            UiUtils.errorAlert(I18n.tr("bom.alert.save.failed"), task.exception?.message ?: I18n.tr("common.alert.unknown.error"))
+            UiUtils.errorAlert("Ошибка", task.exception?.message ?: "Unknown error")
             logger.error("Failed to save BOM", task.exception)
         }
         executor.submit(task)
     }
 
-    /** Отменяет все несохранённые изменения. */
     private fun revertChanges() {
         projectPath?.let { dir ->
-            val bomDoc = BomRepository.load(dir)
-            bomItems.setAll(bomDoc.items)
+            val rows = BomRepository.loadRows(dir)
+            bomRows.setAll(rows)
             savedSnapshot = serializeCurrentState()
-            logger.info("BOM reverted to last saved state")
+            statusLabel.text = "Отменено"
         }
     }
 
-    /** Обрабатывает закрытие окна с защитой от потери данных. */
-    private fun handleWindowClosing() {
-        if (isDirty()) {
-            val alert = Alert(Alert.AlertType.CONFIRMATION)
-            alert.title = I18n.tr("bom.alert.unsaved")
-            alert.headerText = I18n.tr("bom.alert.unsaved.header")
-            alert.contentText = I18n.tr("bom.alert.unsaved.text")
+    private fun serializeCurrentState(): String {
+        return bomRows.map { "${it.bomnetId}|${it.refDes}|${it.componentId}|${it.comment}" }.joinToString(";")
+    }
 
-            val result = alert.showAndWait()
-            when {
-                result.orElse(ButtonType.CANCEL) == ButtonType.YES -> {
-                    saveBom()
-                    if (!isDirty()) stage.close()
-                }
-                result.orElse(ButtonType.CANCEL) == ButtonType.NO -> stage.close()
-                // CANCEL — ничего не делаем
-            }
-        } else {
-            stage.close()
-        }
+    private fun markDirty() {
+        statusLabel.text = "Не сохранено"
+        statusLabel.style = "-fx-text-fill: orange;"
     }
 
     override fun showWindow() = stage.show()
 
     override fun openProject(projectPath: Path) {
         this.projectPath = projectPath
+        stage.title = "CircuitForge — BOM — $projectPath"
 
-        // Загружаем BOM или инициализируем из компонентов
-        val bomDoc = BomRepository.load(projectPath)
-        if (bomDoc.items.isEmpty()) {
-            logger.info("No BOM found, initializing from components")
-            bomItems.setAll(BomRepository.initFromComponents(projectPath).items)
-        } else {
-            bomItems.setAll(bomDoc.items)
-        }
-
+        val rows = BomRepository.loadRows(projectPath)
+        bomRows.setAll(rows)
         savedSnapshot = serializeCurrentState()
-        logger.info("BOM opened for project: $projectPath")
+        statusLabel.text = "Загружено: ${rows.size} элементов"
+        logger.info("BOM opened: $projectPath, ${rows.size} items")
     }
 
     override fun getStage(): Stage = stage

@@ -22,7 +22,6 @@ object ComponentRepository {
     /**
      * Генерирует уникальный slug из имени компонента.
      * Формат: lowercase, пробелы в '-', только a-z0-9-.
-     * При коллизии добавляет -1, -2 и т.д.
      */
     fun generateSlug(name: String): String {
         val base = name.lowercase()
@@ -32,23 +31,7 @@ object ComponentRepository {
             .removePrefix("-")
             .removeSuffix("-")
 
-        if (base.isBlank()) return "component"
-
-        var slug = base
-        var counter = 1
-        while (true) {
-            if (!isSlugInUse(slug)) {
-                return slug
-            }
-            slug = "$base-$counter"
-            counter++
-        }
-    }
-
-    /** Проверяет, занят ли slug в директории проекта. */
-    private fun isSlugInUse(slug: String): Boolean {
-        // Проверка будет выполняться в контексте projectDir
-        return false
+        return if (base.isBlank()) "component" else base
     }
 
     /**
@@ -59,7 +42,7 @@ object ComponentRepository {
         val slug = generateUniqueSlug(projectDir, name)
         val component = Component(
             schemaVersion = 1,
-            slug = slug,
+
             name = name,
             description = description,
             refPrefix = refPrefix,
@@ -76,53 +59,50 @@ object ComponentRepository {
      * переименовывает файл при смене slug.
      * @return актуальный slug
      */
-    fun saveComponent(projectDir: Path, originalSlug: String, name: String, description: String, refPrefix: String, ports: List<Port>): String {
+    fun saveComponent(
+        projectDir: Path,
+        originalSlug: String, // Фактически это имя файла (без .cfcomp)
+        name: String,
+        description: String,
+        refPrefix: String,
+        ports: List<Port>
+    ): String {
         val componentsDir = projectDir.resolve("components")
-        
-        // Проверяем уникальность name (кроме текущего компонента)
-        if (name.isNotBlank() && hasNameConflict(componentsDir, originalSlug, name)) {
-            throw IllegalArgumentException("Component with name '$name' already exists")
+        val oldPath = componentsDir.resolve("${originalSlug}$CFCOMP_EXT")
+
+        // 1. Читаем старый ID (если файл существует)
+        val existingId = if (Files.exists(oldPath)) {
+            try {
+                load(oldPath).id
+            } catch (e: Exception) {
+                java.util.UUID.randomUUID().toString() // Fallback
+            }
+        } else {
+            java.util.UUID.randomUUID().toString()
         }
 
-        // Проверяем, используется ли компонент в BOM
-        val bomDoc = BomRepository.load(projectDir)
-        if (bomDoc.items.any { it.componentSlug == originalSlug }) {
-            throw IllegalArgumentException("Component is used in BOM. Remove it first.")
-        }
+        // 2. Генерируем новое имя файла (передаем originalSlug как исключение!)
+        val newSlug = generateUniqueSlug(projectDir, name, originalSlug) // <-- ИСПРАВЛЕНО
+        val newPath = componentsDir.resolve("${newSlug}$CFCOMP_EXT")
 
-        // Проверяем, используется ли компонент в Nets (через refDes в BOM)
-        val bomRefDesForSlug = bomDoc.items.filter { it.componentSlug == originalSlug }.map { it.refDes }.toSet()
-        val netDoc = NetRepository.load(projectDir)
-        if (bomRefDesForSlug.isNotEmpty() && netDoc.nets.any { net ->
-            net.connections.any { conn -> conn.refDes in bomRefDesForSlug }
-        }) {
-            throw IllegalArgumentException("Component is used in Nets. Remove it first.")
-        }
-
-        val newSlug = generateUniqueSlug(projectDir, name)
+        // 3. Создаем объект с сохраненным ID
         val component = Component(
             schemaVersion = 1,
-            id = java.util.UUID.randomUUID().toString(),
-            slug = newSlug,
+            id = existingId, // <-- СОХРАНЯЕМ СТАРЫЙ ID
             name = name,
             description = description,
             refPrefix = refPrefix,
             ports = ports
         )
 
-        // Переименовываем файл при смене slug
-        val newPath = componentsDir.resolve("${newSlug}$CFCOMP_EXT")
-        val oldPath = componentsDir.resolve("${originalSlug}$CFCOMP_EXT")
-        
+        // 4. Переименовываем файл при необходимости
         if (originalSlug != newSlug && Files.exists(oldPath)) {
             Files.move(oldPath, newPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-            logger.info("Component renamed: $originalSlug -> $newSlug")
-        } else {
-            Files.createDirectories(componentsDir)
+            logger.info("Component file renamed: $originalSlug -> $newSlug")
         }
-        
+
+        // 5. Сохраняем
         save(newPath, component)
-        logger.info("Component saved: $newSlug")
         return newSlug
     }
 
@@ -170,18 +150,17 @@ object ComponentRepository {
                     .forEach { path ->
                         try {
                             val comp = load(path)
-                            val fileName = path.fileName.toString().removeSuffix(CFCOMP_EXT)
-                            // Используем slug из файла или вычисляем из имени
-                            val slug = comp.slug.takeIf { it.isNotBlank() } ?: fileName
+                            // Имя файла без расширения — это наш "slug" для UI
+                            val fileSlug = path.fileName.toString().removeSuffix(CFCOMP_EXT)
+
                             val summary = ComponentSummary(
                                 id = comp.id,
-                                slug = slug,
+                                slug = fileSlug, // Используем имя файла
                                 name = comp.name,
                                 description = comp.description,
                                 refPrefix = comp.refPrefix,
                                 portsCount = comp.ports.size
                             )
-                            logger.info("Loaded component: name=${comp.name}, slug=$slug, ports=${comp.ports.size}")
                             components.add(summary)
                         } catch (e: Exception) {
                             logger.warn("Failed to load component from $path, skipping", e)
@@ -195,13 +174,18 @@ object ComponentRepository {
     }
 
     /** Генерирует уникальный slug с учётом существующих файлов. */
-    private fun generateUniqueSlug(projectDir: Path, name: String): String {
+    private fun generateUniqueSlug(projectDir: Path, name: String, excludeSlug: String? = null): String {
         val baseSlug = generateSlug(name)
         val componentsDir = projectDir.resolve("components")
         var candidate = baseSlug
         var counter = 1
 
         while (true) {
+            // Если кандидат совпадает с исключением — это наш текущий файл, он "свободен"
+            if (candidate == excludeSlug) {
+                return candidate
+            }
+
             val candidatePath = componentsDir.resolve("${candidate}$CFCOMP_EXT")
             if (!Files.exists(candidatePath)) {
                 return candidate
@@ -245,4 +229,28 @@ object ComponentRepository {
             throw e
         }
     }
+    /**
+     * Находит компонент по его UUID, сканируя папку components.
+     * Возвращает null, если компонент не найден.
+     */
+    fun loadComponentById(projectDir: Path, componentId: String): Component? {
+        val componentsDir = projectDir.resolve("components")
+        if (!Files.exists(componentsDir)) return null
+        return try {
+            Files.list(componentsDir).use { stream ->
+                stream.filter { it.fileName.toString().endsWith(CFCOMP_EXT) }
+                    .map { path ->
+                        try { load(path) } catch (e: Exception) { null }
+                    }
+                    .filterNotNull()
+                    .filter { it.id == componentId }
+                    .findFirst()
+                    .orElse(null)
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to find component by id: $componentId", e)
+            null
+        }
+    }
+
 }

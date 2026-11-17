@@ -8,7 +8,6 @@ import java.nio.file.Path
 
 /**
  * Репозиторий для управления BOM документом (ПЭ3).
- * Отвечает за загрузку, сохранение и формирование строк BOM.
  */
 object BomRepository {
     private val logger = LoggerFactory.getLogger(BomRepository::class.java)
@@ -45,65 +44,35 @@ object BomRepository {
     }
 
     /**
-     * Загружает строки BOM с подтягиванием имён компонентов.
-     * componentName подтягивается через ComponentRepository.loadComponent(componentSlug).name.
+     * Загружает строки BOM с подтягиванием имён компонентов по UUID.
      */
     fun loadRows(projectPath: Path): List<BomRow> {
         val bomDoc = load(projectPath)
         val rows = mutableListOf<BomRow>()
 
         bomDoc.items.forEach { item ->
-            val componentName = try {
-                val component = ComponentRepository.loadComponent(projectPath, item.componentSlug)
-                component.name
+            var compName = "<not found>"
+            var prefix = "?"
+            try {
+                val comp = ComponentRepository.loadComponentById(projectPath, item.componentId)
+                if (comp != null) {
+                    compName = comp.name
+                    prefix = comp.refPrefix
+                }
             } catch (e: Exception) {
-                logger.warn("Failed to load component for slug: ${item.componentSlug}", e)
-                "<not found>"
+                logger.warn("Failed to load component by id: ${item.componentId}", e)
             }
 
             rows.add(BomRow(
+                bomnetId = item.bomnetId,
                 number = item.number,
                 refDes = item.refDes,
-                componentSlug = item.componentSlug,
-                componentName = componentName,
-                comment = item.comment
+                componentId = item.componentId,
+                componentName = compName,
+                comment = item.comment,
+                refPrefix = prefix
             ))
         }
-
         return rows
-    }
-
-    /** Формирует начальный BOM из компонентов проекта — по одному элементу на компонент-описание. */
-    fun initFromComponents(projectPath: Path): BomDocument {
-        val componentsDir = projectPath.resolve("components")
-        if (!Files.exists(componentsDir)) return BomDocument()
-
-        val items = mutableListOf<BomItem>()
-        var number = 1
-        try {
-            Files.list(componentsDir).use { stream ->
-                stream.filter { it.fileName.toString().endsWith(".cfcomp") }
-                    .forEach { compPath ->
-                        try {
-                            val comp = ComponentRepository.load(compPath)
-                            // Используем slug из компонента, а не имя файла
-                            val slug = comp.slug.takeIf { it.isNotBlank() }
-                                ?: compPath.fileName.toString().removeSuffix(".cfcomp")
-                            val currentNumber = number++
-                            items.add(BomItem(
-                                number = currentNumber,
-                                refDes = comp.refPrefix + currentNumber,
-                                componentSlug = slug,
-                                comment = comp.description
-                            ))
-                        } catch (e: Exception) {
-                            logger.warn("Failed to load component from $compPath", e)
-                        }
-                    }
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to init BOM from components in $projectPath", e)
-        }
-        return BomDocument(schemaVersion = 1, items = items)
     }
 }

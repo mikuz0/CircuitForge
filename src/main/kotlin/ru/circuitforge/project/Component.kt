@@ -10,7 +10,6 @@ import kotlinx.serialization.Serializable
 data class Component(
     val schemaVersion: Int = 1,
     val id: String = java.util.UUID.randomUUID().toString(),
-    val slug: String = "",
     val name: String = "",
     val description: String = "",
     val model3dPath: String? = null,

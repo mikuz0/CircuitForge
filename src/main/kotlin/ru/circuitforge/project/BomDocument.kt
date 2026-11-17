@@ -4,7 +4,6 @@ import kotlinx.serialization.Serializable
 
 /**
  * Документ спецификации списка компонентов (BOM / ПЭ3).
- * Содержит плоский список элементов — каждый элемент = один установленный компонент на плате.
  */
 @Serializable
 data class BomDocument(
@@ -14,23 +13,28 @@ data class BomDocument(
 
 /**
  * Элемент BOM — одна строка перечня элементов.
- * number — порядковый номер (1, 2, 3...), refDes — позиционное обозначение (R1, C2, DD1...).
+ * bomnetId — уникальный UUID экземпляра (связывает BOM и Nets).
+ * componentId — UUID компонента-описания (ссылка на .cfcomp файл).
  */
 @Serializable
 data class BomItem(
+    val bomnetId: String = java.util.UUID.randomUUID().toString(),
     val number: Int = 0,
     val refDes: String = "",
-    val componentSlug: String = "",
+    val componentId: String = "",
     val comment: String = ""
 )
 
 /**
- * Строка BOM с подтянутым именем компонента.
+ * Строка BOM с подтянутыми данными компонента для отображения в UI.
+ * refPrefix берется из компонента и используется для генерации RefDes.
  */
 data class BomRow(
+    val bomnetId: String,
     val number: Int,
     val refDes: String,
-    val componentSlug: String,
+    val componentId: String,
     val componentName: String,
-    val comment: String
+    val comment: String,
+    val refPrefix: String = ""
 )
