@@ -163,6 +163,7 @@ class BomWindow : ProjectAware {
                 number = 0, // Пересчитается при сохранении
                 refDes = newRefDes,
                 componentId = comp.id,
+                componentSlug = comp.slug,
                 componentName = comp.name,
                 comment = "",
                 refPrefix = prefix
@@ -223,6 +224,7 @@ class BomWindow : ProjectAware {
                             number = row.number,
                             refDes = row.refDes,
                             componentId = row.componentId,
+                            componentSlug = row.componentSlug,
                             comment = row.comment
                         )
                     }

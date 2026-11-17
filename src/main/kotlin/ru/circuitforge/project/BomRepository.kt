@@ -44,6 +44,49 @@ object BomRepository {
     }
 
     /**
+     * Создаёт новый BOM-документ из всех компонентов проекта.
+     * Каждый компонент становится одной строкой BOM с авто-сгенерированным RefDes.
+     */
+    fun initFromComponents(projectPath: Path): BomDocument {
+        val componentsDir = projectPath.resolve("components")
+        if (!Files.exists(componentsDir)) {
+            logger.warn("No components directory found at $componentsDir")
+            return BomDocument()
+        }
+
+        val items = mutableListOf<BomItem>()
+        try {
+            Files.list(componentsDir).use { stream ->
+                stream.filter { it.fileName.toString().endsWith(".cfcomp") }
+                    .sorted()
+                    .forEach { path ->
+                        try {
+                            val comp = ComponentRepository.load(path)
+                            val slug = path.fileName.toString().removeSuffix(".cfcomp")
+                            val prefix = comp.refPrefix.uppercase()
+                            val refDes = if (prefix.isNotBlank()) "$prefix${items.size + 1}" else "COMP${items.size + 1}"
+                            items.add(
+                                BomItem(
+                                    number = items.size + 1,
+                                    refDes = refDes,
+                                    componentId = comp.id,
+                                    componentSlug = slug,
+                                    comment = comp.description
+                                )
+                            )
+                        } catch (e: Exception) {
+                            logger.warn("Failed to load component from $path, skipping", e)
+                        }
+                    }
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to scan components directory: $componentsDir", e)
+        }
+
+        return BomDocument(schemaVersion = 1, items = items)
+    }
+
+    /**
      * Загружает строки BOM с подтягиванием имён компонентов по UUID.
      */
     fun loadRows(projectPath: Path): List<BomRow> {
@@ -53,11 +96,29 @@ object BomRepository {
         bomDoc.items.forEach { item ->
             var compName = "<not found>"
             var prefix = "?"
+            var slug = item.componentSlug
             try {
                 val comp = ComponentRepository.loadComponentById(projectPath, item.componentId)
                 if (comp != null) {
                     compName = comp.name
                     prefix = comp.refPrefix
+                    // Resolve slug from component filename if not already set
+                    if (slug.isBlank()) {
+                        val componentsDir = projectPath.resolve("components")
+                        if (Files.exists(componentsDir)) {
+                            Files.list(componentsDir).use { stream ->
+                                stream.filter { it.fileName.toString().endsWith(".cfcomp") }
+                                    .forEach { path ->
+                                        try {
+                                            val loadedComp = ComponentRepository.load(path)
+                                            if (loadedComp.id == item.componentId) {
+                                                slug = path.fileName.toString().removeSuffix(".cfcomp")
+                                            }
+                                        } catch (e: Exception) { /* skip */ }
+                                    }
+                            }
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 logger.warn("Failed to load component by id: ${item.componentId}", e)
@@ -68,6 +129,7 @@ object BomRepository {
                 number = item.number,
                 refDes = item.refDes,
                 componentId = item.componentId,
+                componentSlug = slug,
                 componentName = compName,
                 comment = item.comment,
                 refPrefix = prefix

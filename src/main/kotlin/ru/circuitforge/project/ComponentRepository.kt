@@ -238,14 +238,13 @@ object ComponentRepository {
         if (!Files.exists(componentsDir)) return null
         return try {
             Files.list(componentsDir).use { stream ->
-                stream.filter { it.fileName.toString().endsWith(CFCOMP_EXT) }
+                stream.toList()
+                    .filter { it.fileName.toString().endsWith(CFCOMP_EXT) }
                     .map { path ->
                         try { load(path) } catch (e: Exception) { null }
                     }
                     .filterNotNull()
-                    .filter { it.id == componentId }
-                    .findFirst()
-                    .orElse(null)
+                    .firstOrNull { it.id == componentId }
             }
         } catch (e: Exception) {
             logger.error("Failed to find component by id: $componentId", e)
