@@ -115,10 +115,49 @@ class BomWindow : ProjectAware {
         val commentCol = TableColumn<BomRow, String>("Комментарий")
         commentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.comment) }
         commentCol.prefWidth = 300.0
-        commentCol.cellFactory = javafx.util.Callback { _ -> TextFieldTableCell<BomRow, String>() }
+        commentCol.cellFactory = javafx.util.Callback { _ ->
+            object : TableCell<BomRow, String>() {
+                private val textField = TextField()
+                init {
+                    textField.setOnAction {
+                        commitEdit(textField.text)
+                    }
+                    textField.focusedProperty().addListener { _, _, isFocused ->
+                        if (!isFocused) commitEdit(textField.text)
+                    }
+                }
+                override fun startEdit() {
+                    super.startEdit()
+                    textField.text = item ?: ""
+                    graphic = textField
+                    text = null
+                    textField.requestFocus()
+                    textField.selectAll()
+                }
+                override fun cancelEdit() {
+                    super.cancelEdit()
+                    text = item
+                    graphic = null
+                }
+                override fun updateItem(item: String?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    if (empty || item == null) {
+                        text = null
+                        graphic = null
+                    } else if (isEditing) {
+                        textField.text = item
+                        graphic = textField
+                        text = null
+                    } else {
+                        text = item
+                        graphic = null
+                    }
+                }
+            }
+        }
         commentCol.setOnEditCommit { event ->
             val row = event.rowValue
-            val newComment = event.newValue ?: ""
+            val newComment = event.newValue?.trim() ?: ""
             val index = bomRows.indexOf(row)
             if (index >= 0) {
                 bomRows[index] = row.copy(comment = newComment)
