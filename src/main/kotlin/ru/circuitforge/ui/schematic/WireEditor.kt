@@ -159,8 +159,9 @@ class WireEditor(
      * Находит ближайшую автоматическую линию цепи.
      * Возвращает (netName, snapX, snapY) — имя цепи и координаты привязки.
      */
+
     fun findNearestNetLine(sceneX: Double, sceneY: Double): Triple<String, Double, Double>? {
-        var bestDist = 15.0
+        var bestDist = 10.0
         var bestNetName: String? = null
         var bestSnapX = 0.0
         var bestSnapY = 0.0
@@ -170,37 +171,66 @@ class WireEditor(
             val pinPoints = getNetPoints(net)
             if (pinPoints.size < 2) return@forEach
 
-            // Цепочка сегментов: пользовательский путь или автоматический "звезда"
+            // Строим цепочку сегментов, соответствующую реальной отрисовке
             val chain = mutableListOf<Pair<Double, Double>>()
             val userPath = netPaths.find { it.netName == net.name }
+
             if (userPath != null && userPath.waypoints.isNotEmpty()) {
+                // Пользовательский путь: пин1 -> waypoints -> пин2
                 chain.add(pinPoints[0])
                 chain.addAll(userPath.waypoints.map { Pair(it.x, it.y) })
                 chain.add(pinPoints[pinPoints.size - 1])
             } else {
-                chain.add(pinPoints[0])
-                for (i in 1 until pinPoints.size) chain.add(pinPoints[i])
+                // Автоматический путь: пин1 -> угол -> пин2 (для первых двух пинов)
+                // Если пинов больше двух, там рисуются "звезды" от первого пина.
+                val p1 = pinPoints[0]
+                for (i in 1 until pinPoints.size) {
+                    val p2 = pinPoints[i]
+                    // Угол (ортогональная трассировка): сначала горизонталь, потом вертикаль
+                    val cornerX = p2.first
+                    val cornerY = p1.second
+
+                    chain.add(p1)
+                    chain.add(Pair(cornerX, cornerY))
+                    chain.add(p2)
+                }
             }
 
+            // Ищем ближайший сегмент
             for (i in 0 until chain.size - 1) {
-                val p1 = chain[i]; val p2 = chain[i + 1]
+                val p1 = chain[i]
+                val p2 = chain[i + 1]
+
+                // Пропускаем сегменты нулевой длины
+                if (p1.first == p2.first && p1.second == p2.second) continue
+
                 val dist = distanceToSegment(sceneX, sceneY, p1.first, p1.second, p2.first, p2.second)
+
                 if (dist < bestDist) {
+                    // Вычисляем точку на сегменте (проекция)
                     val dx = p2.first - p1.first
                     val dy = p2.second - p1.second
                     val lenSq = dx * dx + dy * dy
                     var t = if (lenSq > 0) ((sceneX - p1.first) * dx + (sceneY - p1.second) * dy) / lenSq else 0.0
                     t = t.coerceIn(0.0, 1.0)
+
+                    val snapX = (p1.first + t * dx).roundToGrid()
+                    val snapY = (p1.second + t * dy).roundToGrid()
+
+                    // Не ставим точку, если она слишком близко к концам (пинам)
+                    val distToStart = kotlin.math.hypot(snapX - p1.first, snapY - p1.second)
+                    val distToEnd = kotlin.math.hypot(snapX - p2.first, snapY - p2.second)
+                    if (distToStart < 15.0 || distToEnd < 15.0) continue
+
                     bestNetName = net.name
-                    bestSnapX = (p1.first + t * dx).roundToGrid()
-                    bestSnapY = (p1.second + t * dy).roundToGrid()
+                    bestSnapX = snapX
+                    bestSnapY = snapY
                     bestDist = dist
                 }
             }
         }
-        return if (bestNetName != null && bestDist <= 15.0) Triple(bestNetName, bestSnapX, bestSnapY) else null
+        return if (bestNetName != null) Triple(bestNetName, bestSnapX, bestSnapY) else null
     }
-
     /** Привязка координаты к сетке 12.5px. */
     private fun Double.roundToGrid(): Double {
         val gridStep = 12.5
@@ -279,8 +309,8 @@ class WireEditor(
                 else if (portIndex == 1) return Pair(node.x + 50.0, node.y)
             }
             "capacitor" -> {
-                if (portIndex == 0) return Pair(node.x, node.y - 25.0)
-                else if (portIndex == 1) return Pair(node.x, node.y + 25.0)
+                if (portIndex == 0) return Pair(node.x - 50.0, node.y) // Левая ножка
+                else if (portIndex == 1) return Pair(node.x + 50.0, node.y) // Правая ножка
             }
             else -> {
                 val allPorts = comp.ports

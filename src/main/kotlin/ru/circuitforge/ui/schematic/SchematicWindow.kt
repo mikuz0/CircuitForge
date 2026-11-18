@@ -285,14 +285,26 @@ class SchematicWindow : ProjectAware {
             group.setOnMouseDragged { event ->
                 val currentNode = dragNode
                 if (currentNode != null) {
-                    val newX = event.sceneX - dragOffsetX
-                    val newY = event.sceneY - dragOffsetY
-                    val updatedNode = currentNode.copy(x = newX, y = newY)
+                    // 1. Получаем "сырые" координаты
+                    val rawX = event.sceneX - dragOffsetX
+                    val rawY = event.sceneY - dragOffsetY
+
+                    // 2. Привязываем к сетке (шаг 12.5)
+                    val gridStep = 12.5
+                    val snappedX = kotlin.math.round(rawX / gridStep) * gridStep
+                    val snappedY = kotlin.math.round(rawY / gridStep) * gridStep
+
+                    // 3. Обновляем модель
+                    val updatedNode = currentNode.copy(x = snappedX, y = snappedY)
                     nodesMap[currentNode.bomnetId] = updatedNode
                     val idx = schematicNodes.indexOfFirst { it.bomnetId == currentNode.bomnetId }
                     if (idx >= 0) schematicNodes[idx] = updatedNode
-                    group.layoutX = newX
-                    group.layoutY = newY
+
+                    // 4. Двигаем группу
+                    group.layoutX = snappedX
+                    group.layoutY = snappedY
+
+                    // 5. Перерисовываем линии
                     drawLines()
                 }
             }
