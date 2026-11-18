@@ -120,6 +120,8 @@ class ProjectsView {
     /** Перестраивает сцену с новыми переводами. */
     fun rebuildScene() {
         updateLabels()
+        // Обновляем текст в localeComboBox
+        localeComboBox.value = I18n.getCurrentLocale()
     }
 
     /** Обновляет все тексты на текущий язык. */

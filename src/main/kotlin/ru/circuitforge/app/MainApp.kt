@@ -60,8 +60,9 @@ class MainApp : Application() {
         view.onComponentsClick = { openModule("components") }
         view.onSchematicClick = { openModule("schematic") }
         view.onLocaleChange = { locale ->
+            val newSettings = SettingsStore.load().withLocale(locale)
             I18n.load(locale)
-            SettingsStore.save(settings.withLocale(locale))
+            SettingsStore.save(newSettings)
             logger.info("Locale changed to: ${locale.displayName}")
             // Перезагружаем view для обновления текстов
             view.rebuildScene()

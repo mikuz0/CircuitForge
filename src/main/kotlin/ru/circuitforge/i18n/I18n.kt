@@ -17,7 +17,7 @@ object I18n {
 
     fun load(locale: LocaleType) {
         currentLocale = locale
-        val bundleLocale = if (locale == LocaleType.RU) Locale("ru") else Locale.ENGLISH
+        val bundleLocale = if (locale == LocaleType.RU) Locale("ru") else Locale.ROOT
         bundle = ResourceBundle.getBundle("messages", bundleLocale)
     }
 
@@ -39,6 +39,12 @@ object I18n {
 
     /** Получить displayName текущего языка. */
     fun getCurrentDisplayName(): String = currentLocale.displayName
+
+    /** Принудительно перезагружает Bundle текущего языка. */
+    fun reload() {
+        bundle = null
+        load(currentLocale)
+    }
 
     /** Инициализация по умолчанию (EN). */
     init {
