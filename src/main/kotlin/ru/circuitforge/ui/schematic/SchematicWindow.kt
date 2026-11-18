@@ -4,7 +4,6 @@ import javafx.collections.FXCollections
 import javafx.concurrent.Task
 import javafx.geometry.Insets
 import javafx.geometry.Pos
-import javafx.scene.Cursor
 import javafx.scene.Group
 import javafx.scene.Scene
 import javafx.scene.canvas.Canvas
@@ -12,12 +11,10 @@ import javafx.scene.canvas.GraphicsContext
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.ScrollPane
-import javafx.scene.input.MouseEvent
 import javafx.scene.layout.*
 import javafx.scene.paint.Color
+import javafx.scene.shape.Line
 import javafx.scene.shape.Rectangle
-import javafx.scene.text.Font
-import javafx.scene.text.FontWeight
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
 import ru.circuitforge.i18n.I18n
@@ -27,11 +24,6 @@ import ru.circuitforge.ui.common.UiUtils
 import java.nio.file.Path
 import java.util.concurrent.Executors
 
-/**
- * Окно визуальной схемы (Schematic).
- * Canvas (сетка + линии) + Pane (компоненты с Drag & Drop).
- * Исправлен Layout Loop через isManaged = false и фиксированные размеры.
- */
 class SchematicWindow : ProjectAware {
     private val logger = LoggerFactory.getLogger(SchematicWindow::class.java)
     private val stage = Stage()
@@ -41,13 +33,15 @@ class SchematicWindow : ProjectAware {
 
     private var projectPath: Path? = null
 
-    // Данные
+    // Данные (Observable для UI)
     private val bomRows = FXCollections.observableArrayList<BomRow>()
     private val nets = FXCollections.observableArrayList<Net>()
     private val schematicNodes = FXCollections.observableArrayList<SchematicNode>()
-    
-    // Map для быстрого доступа к узлам по bomnetId
+
+    // Map для быстрого доступа
     private val nodesMap = mutableMapOf<String, SchematicNode>()
+    private val bomRowsMap = mutableMapOf<String, BomRow>() // bomnetId -> BomRow
+    private val componentsMap = mutableMapOf<String, Component>() // componentId -> Component
 
     // UI контейнеры
     private val canvas = Canvas(3000.0, 3000.0)
@@ -59,7 +53,7 @@ class SchematicWindow : ProjectAware {
     private val statusLabel = Label("")
 
     // Drag & Drop состояние
-    private var draggingNode: SchematicNode? = null
+    private var dragNode: SchematicNode? = null
     private var dragOffsetX: Double = 0.0
     private var dragOffsetY: Double = 0.0
 
@@ -70,28 +64,32 @@ class SchematicWindow : ProjectAware {
     }
 
     private fun setupLayout() {
-        // Фиксируем размеры Canvas
-        canvas.width = 3000.0
-        canvas.height = 3000.0
-        
-        // ComponentPane для компонентов (с фиксированными размерами и isManaged = false)
-        componentPane.prefWidth = 3000.0
-        componentPane.prefHeight = 3000.0
+        // 1. Размеры холста (5000x5000)
+        canvas.width = 5000.0
+        canvas.height = 5000.0
+
+        // 2. Слой компонентов
+        componentPane.prefWidth = 5000.0
+        componentPane.prefHeight = 5000.0
         componentPane.isManaged = false
         componentPane.isPickOnBounds = false
 
-        // MainPane содержит Canvas и componentPane
+        // 3. Основной Pane, содержащий Canvas и компоненты
         mainPane.children.setAll(canvas, componentPane)
-        mainPane.prefWidth = 3000.0
-        mainPane.prefHeight = 3000.0
-        mainPane.isManaged = false
+        mainPane.prefWidth = 5000.0
+        mainPane.prefHeight = 5000.0
 
-        // ScrollPane с fitToWidth/Height
-        scrollPane.content = mainPane
+        // 4. Оборачиваем mainPane в Group.
+        // Group автоматически подстраивает свои границы под содержимое (5000x5000).
+        val group = Group(mainPane)
+
+        // 5. Настраиваем ScrollPane
+        scrollPane.content = group
         scrollPane.hbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
         scrollPane.vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
-        scrollPane.fitToWidthProperty().value = true
-        scrollPane.fitToHeightProperty().value = true
+        // Отключаем fitToWidth/Height, чтобы ScrollPane не сжимал содержимое
+        scrollPane.isFitToWidth = false
+        scrollPane.isFitToHeight = false
 
         // Панель инструментов снизу
         val bottomBar = HBox(10.0, saveButton, revertButton, statusLabel).apply {
@@ -116,18 +114,13 @@ class SchematicWindow : ProjectAware {
     }
 
     private fun drawSchematic() {
-        // Очищаем map узлов
         nodesMap.clear()
-        
-        // Сохраняем узлы в map
-        schematicNodes.forEach { node ->
-            nodesMap[node.bomnetId] = node
-        }
+        schematicNodes.forEach { node -> nodesMap[node.bomnetId] = node }
 
-        // Рисуем линии на Canvas
+        bomRowsMap.clear()
+        bomRows.forEach { row -> bomRowsMap[row.bomnetId] = row }
+
         drawLines()
-
-        // Создаём компоненты в componentPane
         drawComponents()
     }
 
@@ -136,14 +129,10 @@ class SchematicWindow : ProjectAware {
         val width = canvas.width
         val height = canvas.height
 
-        // Очистка
         gc.fill = Color.WHITE
         gc.fillRect(0.0, 0.0, width, height)
 
-        // Рисуем сетку
         drawGrid(gc)
-
-        // Рисуем связи
         drawConnections(gc)
     }
 
@@ -151,12 +140,10 @@ class SchematicWindow : ProjectAware {
         gc.stroke = Color.LIGHTGRAY
         gc.lineWidth = 0.5
 
-        // Вертикальные линии каждые 50px
         (0..canvas.width.toInt() step 50).forEach { x ->
             gc.strokeLine(x.toDouble(), 0.0, x.toDouble(), canvas.height)
         }
 
-        // Горизонтальные линии каждые 50px
         (0..canvas.height.toInt() step 50).forEach { y ->
             gc.strokeLine(0.0, y.toDouble(), canvas.width, y.toDouble())
         }
@@ -164,27 +151,31 @@ class SchematicWindow : ProjectAware {
 
     private fun drawConnections(gc: GraphicsContext) {
         gc.lineWidth = 2.0
-        gc.stroke = Color.web("#2196F3") // Accent color
+        gc.stroke = Color.web("#2196F3") // Синий цвет
 
         nets.forEach { net ->
-            if (net.connections.isEmpty()) return@forEach
+            if (net.connections.size < 2) return@forEach
 
-            // Собираем координаты всех подключенных компонентов
+            // Собираем точные координаты (x, y) для каждого подключения в цепи
             val points = mutableListOf<Pair<Double, Double>>()
+
             net.connections.forEach { conn ->
                 val row = bomRows.find { it.refDes == conn.refDes }
-                row?.let { bomRow ->
-                    val node = nodesMap[bomRow.bomnetId]
-                    node?.let {
-                        points.add(Pair(it.x + 75.0, it.y + 50.0)) // Центр компонента (150x100 / 2)
+                if (row != null) {
+                    val coords = getPortCoordinates(row, conn.pinNumber)
+                    if (coords != null) {
+                        points.add(coords)
                     }
                 }
             }
 
-            // Рисуем ортогональные линии между точками
+            // Рисуем линии между точками
             if (points.size >= 2) {
-                for (i in 0 until points.size - 1) {
-                    drawOrthogonalLine(gc, points[i], points[i + 1])
+                // Для простоты соединяем все с первой точкой (звездой)
+                val startPoint = points[0]
+                for (i in 1 until points.size) {
+                    val endPoint = points[i]
+                    drawOrthogonalLine(gc, startPoint, endPoint)
                 }
             }
         }
@@ -194,7 +185,7 @@ class SchematicWindow : ProjectAware {
         val (x1, y1) = start
         val (x2, y2) = end
 
-        // L-образная форма: сначала горизонталь, потом вертикаль
+        // Простой L-образный путь: сначала горизонталь, потом вертикаль
         gc.strokeLine(x1, y1, x2, y1)
         gc.strokeLine(x2, y1, x2, y2)
     }
@@ -202,109 +193,143 @@ class SchematicWindow : ProjectAware {
     private fun drawComponents() {
         componentPane.children.clear()
 
-        bomRows.forEach { row ->
+        bomRowsMap.values.forEach { row ->
             val node = nodesMap[row.bomnetId] ?: return@forEach
+            val comp = componentsMap[row.componentId]
 
-            val x = node.x
-            val y = node.y
+            val allPorts = comp?.ports ?: emptyList()
+            val mid = (allPorts.size + 1) / 2
+            val leftPorts = allPorts.take(mid)
+            val rightPorts = allPorts.drop(mid)
 
-            // Прямоугольник компонента — позиция (0, 0) относительно Group
-            val rect = Rectangle(0.0, 0.0, 150.0, 100.0).apply {
+            val portSpacing = 25.0
+            val paddingTop = 60.0
+            val paddingBottom = 20.0
+            val minHeight = 100.0
+
+            val maxPorts = maxOf(leftPorts.size, rightPorts.size)
+            val calculatedHeight = maxOf(minHeight, (paddingTop + maxPorts * portSpacing + paddingBottom))
+
+            val width = 160.0
+            val height = calculatedHeight
+
+            val group = Group()
+
+            val rect = Rectangle(width, height).apply {
                 fill = Color.WHITE
                 stroke = Color.BLACK
                 strokeWidth = 1.5
-                cursor = Cursor.MOVE
+                x = -width / 2
+                y = -height / 2
             }
+            group.children.add(rect)
 
-            // Label для RefDes
             val refDesLabel = Label(row.refDes).apply {
-                font = Font.font("Arial", FontWeight.BOLD, 14.0)
-                layoutX = 10.0
-                layoutY = 15.0
+                style = "-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: black;"
+                layoutX = -width / 2 + 10.0
+                layoutY = -height / 2 + 10.0
+            }
+            group.children.add(refDesLabel)
+
+            val nameLabel = Label(comp?.name ?: "").apply {
+                style = "-fx-font-size: 10px; -fx-text-fill: gray;"
+                layoutX = -width / 2 + 10.0
+                layoutY = -height / 2 + 28.0
+            }
+            group.children.add(nameLabel)
+
+            // Левые порты
+            leftPorts.forEachIndexed { index, port ->
+                val pinY = -height / 2 + paddingTop + index * portSpacing
+
+                val line = Line(-width / 2, pinY, -width / 2 - 20.0, pinY).apply {
+                    stroke = Color.BLACK
+                }
+                group.children.add(line)
+
+                val pinNumLabel = Label(port.pinNumber).apply {
+                    style = "-fx-font-size: 9px; -fx-text-fill: black;"
+                    layoutX = -width / 2 - 18.0
+                    layoutY = pinY - 14.0
+                }
+                group.children.add(pinNumLabel)
+
+                val portNameLabel = Label(port.name).apply {
+                    style = "-fx-font-size: 10px; -fx-text-fill: black;"
+                    layoutX = -width / 2 + 5.0
+                    layoutY = pinY - 8.0
+                }
+                group.children.add(portNameLabel)
             }
 
-            // Label для имени компонента
-            val nameLabel = Label(row.componentName).apply {
-                font = Font.font("Arial", FontWeight.NORMAL, 11.0)
-                layoutX = 10.0
-                layoutY = 35.0
+            // Правые порты
+            rightPorts.forEachIndexed { index, port ->
+                val pinY = -height / 2 + paddingTop + index * portSpacing
+
+                val line = Line(width / 2, pinY, width / 2 + 20.0, pinY).apply {
+                    stroke = Color.BLACK
+                }
+                group.children.add(line)
+
+                val pinNumLabel = Label(port.pinNumber).apply {
+                    style = "-fx-font-size: 9px; -fx-text-fill: black;"
+                    layoutX = width / 2 + 4.0
+                    layoutY = pinY - 14.0
+                }
+                group.children.add(pinNumLabel)
+
+                val portNameLabel = Label(port.name).apply {
+                    style = "-fx-font-size: 10px; -fx-text-fill: black;"
+                    layoutX = width / 2 - 45.0
+                    layoutY = pinY - 8.0
+                }
+                group.children.add(portNameLabel)
             }
 
-            // Labels для портов
-            val portLabels = mutableListOf<Label>()
-            var portY = 55.0
-            nets.forEach { net ->
-                net.connections.forEach { conn ->
-                    if (conn.refDes == row.refDes && conn.pinNumber.isNotBlank()) {
-                        Label("P${conn.pinNumber}").apply {
-                            font = Font.font("Arial", FontWeight.NORMAL, 10.0)
-                            layoutX = 10.0
-                            layoutY = portY
-                            portLabels.add(this)
-                        }
-                        portY += 15.0
-                    }
+            group.layoutX = node.x
+            group.layoutY = node.y
+
+            group.setOnMousePressed { event ->
+                dragNode = node
+                dragOffsetX = event.sceneX - group.layoutX
+                dragOffsetY = event.sceneY - group.layoutY
+                group.toFront()
+            }
+            group.setOnMouseDragged { event ->
+                val currentNode = dragNode
+                if (currentNode != null) {
+                    val newX = event.sceneX - dragOffsetX
+                    val newY = event.sceneY - dragOffsetY
+
+                    val updatedNode = currentNode.copy(x = newX, y = newY)
+                    nodesMap[currentNode.bomnetId] = updatedNode
+
+                    // Обновляем схему
+                    val idx = schematicNodes.indexOfFirst { it.bomnetId == currentNode.bomnetId }
+                    if (idx >= 0) schematicNodes[idx] = updatedNode
+
+                    group.layoutX = newX
+                    group.layoutY = newY
+                    drawLines()
                 }
             }
-
-            // VBox для текста внутри компонента
-            val textVBox = VBox(5.0, refDesLabel, nameLabel).apply {
-                layoutX = 10.0
-                layoutY = 10.0
-                children.addAll(portLabels)
-            }
-
-            // Group объединяет Rectangle и VBox — двигаются вместе
-            val componentGroup = Group(rect, textVBox).apply {
-                layoutX = x
-                layoutY = y
-            }
-
-            // Обработчики Drag & Drop на Group
-            componentGroup.addEventHandler(MouseEvent.MOUSE_PRESSED) { event ->
-                draggingNode = node
-                dragOffsetX = event.sceneX - componentGroup.layoutXProperty().value
-                dragOffsetY = event.sceneY - componentGroup.layoutYProperty().value
-                componentGroup.toFront()
-                rect.fill = Color.web("#E3F2FD") // Подсветка
-            }
-
-            componentGroup.addEventHandler(MouseEvent.MOUSE_DRAGGED) { event ->
-                if (draggingNode == null) return@addEventHandler
-                
-                val newX = event.sceneX - dragOffsetX
-                val newY = event.sceneY - dragOffsetY
-                
-                // Вычисляем смещение
-                val dx = newX - componentGroup.layoutXProperty().value
-                val dy = newY - componentGroup.layoutYProperty().value
-                
-                // Обновляем координаты в модели
-                draggingNode?.let { n ->
-                    n.x += dx
-                    n.y += dy
-                }
-                
-                // Перемещаем Group
-                componentGroup.layoutX = newX
-                componentGroup.layoutY = newY
-                
-                // Перерисовываем линии
-                drawLines()
-            }
-
-            componentGroup.addEventHandler(MouseEvent.MOUSE_RELEASED) { event ->
-                if (draggingNode == null) return@addEventHandler
-                
-                draggingNode = null
-                rect.fill = Color.WHITE // Возвращаем белый цвет
-                
-                // Автосохранение
+            group.setOnMouseReleased {
+                dragNode = null
                 saveSchematicAsync()
             }
 
-            componentPane.children.add(componentGroup)
+            componentPane.children.add(group)
         }
+    }
+
+    private fun calculateRectHeight(row: BomRow): Double {
+        val portCount = nets.flatMap { net ->
+            net.connections.filter { it.refDes == row.refDes }
+        }.distinctBy { it.pinNumber }.size
+
+        val halfSize = (portCount + 1) / 2
+        val maxPorts = maxOf(halfSize, portCount - halfSize)
+        return maxOf(100, maxPorts * 25 + 40).toDouble()
     }
 
     private fun generateGridCoordinates(rows: List<BomRow>): List<SchematicNode> {
@@ -402,21 +427,31 @@ class SchematicWindow : ProjectAware {
         this.projectPath = projectPath
         stage.title = "CircuitForge — Schematic — $projectPath"
 
-        // Загружаем данные в фоновом потоке
         val loadTask = object : Task<Unit>() {
             override fun call() {
-                // Загружаем BOM
                 val rows = BomRepository.loadRows(projectPath)
                 bomRows.setAll(rows)
 
-                // Загружаем Nets
+                // Заполняем bomRowsMap
+                bomRowsMap.clear()
+                rows.forEach { row -> bomRowsMap[row.bomnetId] = row }
+
+                // Загружаем компоненты
+                componentsMap.clear()
+                rows.forEach { row ->
+                    try {
+                        val comp = ComponentRepository.loadComponentById(projectPath, row.componentId)
+                        if (comp != null) componentsMap[row.componentId] = comp
+                    } catch (e: Exception) {
+                        logger.warn("Failed to load component for row ${row.refDes}", e)
+                    }
+                }
+
                 val netDoc = NetRepository.load(projectPath)
                 nets.setAll(netDoc.nets)
 
-                // Загружаем или генерируем Schematic
                 val existingDoc = SchematicRepository.load(projectPath)
                 if (existingDoc.nodes.isEmpty()) {
-                    // Первый запуск — генерируем координаты
                     logger.info("No schematic data found, generating grid layout")
                     val nodes = generateGridCoordinates(rows)
                     SchematicRepository.save(projectPath, SchematicDocument(schemaVersion = 1, nodes = nodes))
@@ -427,7 +462,6 @@ class SchematicWindow : ProjectAware {
             }
 
             override fun succeeded() {
-                // Отрисовка на FX потоке
                 javafx.application.Platform.runLater {
                     drawSchematic()
                     statusLabel.text = "Загружено: ${bomRows.size} компонентов, ${nets.size} цепей"
@@ -450,4 +484,52 @@ class SchematicWindow : ProjectAware {
     }
 
     override fun getStage(): Stage = stage
+    /**
+     * Вычисляет точные координаты (x, y) для конкретного порта компонента.
+     * @param row Строка BOM (для получения RefDes и bomnetId)
+     * @param pinNumber Номер вывода (например, "14")
+     * @return Пара (x, y) или null, если порт не найден
+     */
+    private fun getPortCoordinates(row: BomRow, pinNumber: String): Pair<Double, Double>? {
+        val node = nodesMap[row.bomnetId] ?: return null
+        val comp = componentsMap[row.componentId] ?: return null
+
+        // 1. Находим порт в компоненте
+        val portIndex = comp.ports.indexOfFirst { it.pinNumber == pinNumber }
+        if (portIndex == -1) return null
+
+        // 2. Рассчитываем параметры прямоугольника (как в drawComponents)
+        val allPorts = comp.ports
+        val mid = (allPorts.size + 1) / 2
+        val leftPorts = allPorts.take(mid)
+        val rightPorts = allPorts.drop(mid)
+
+        val portSpacing = 25.0
+        val paddingTop = 60.0
+        val paddingBottom = 20.0
+        val minHeight = 100.0
+
+        val maxPorts = maxOf(leftPorts.size, rightPorts.size)
+        val calculatedHeight = maxOf(minHeight, (paddingTop + maxPorts * portSpacing + paddingBottom))
+        val width = 160.0
+        val height = calculatedHeight
+
+        // 3. Определяем, слева или справа порт
+        val isLeft = portIndex < mid
+        val indexInHalf = if (isLeft) portIndex else portIndex - mid
+
+        // 4. Вычисляем Y (относительно центра группы)
+        val pinY = -height / 2 + paddingTop + indexInHalf * portSpacing
+
+        // 5. Вычисляем X (относительно центра группы)
+        // Если слева, то X = -width/2 - 20 (конец ножки). Если справа, то +width/2 + 20.
+        // Мы берем конец ножки, чтобы линия шла от конца, а не от края прямоугольника.
+        val pinX = if (isLeft) -width / 2 - 20.0 else width / 2 + 20.0
+
+        // 6. Абсолютные координаты на холсте
+        val absX = node.x + pinX
+        val absY = node.y + pinY
+
+        return Pair(absX, absY)
+    }
 }
