@@ -18,6 +18,7 @@ import ru.circuitforge.ui.projects.ProjectsView
 import ru.circuitforge.ui.components.ComponentsWindow
 import ru.circuitforge.ui.editor.BomWindow
 import ru.circuitforge.ui.nets.NetWindow
+import ru.circuitforge.ui.schematic.SchematicWindow
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.Executors
@@ -57,6 +58,7 @@ class MainApp : Application() {
         view.onBomClick = { openModule("bom") }
         view.onNetsClick = { openModule("nets") }
         view.onComponentsClick = { openModule("components") }
+        view.onSchematicClick = { openModule("schematic") }
         view.onLocaleChange = { locale ->
             I18n.load(locale)
             SettingsStore.save(settings.withLocale(locale))
@@ -129,6 +131,11 @@ class MainApp : Application() {
                 val compWindow = ComponentsWindow()
                 compWindow.openProject(project.path)
                 moduleStage = compWindow.getStage()
+            }
+            "schematic" -> {
+                val schematicWindow = SchematicWindow()
+                schematicWindow.openProject(project.path)
+                moduleStage = schematicWindow.getStage()
             }
         }
         moduleStage.title = "${project.name} — $moduleName"

@@ -34,6 +34,7 @@ class ProjectsView {
     private val bomBtn = Button()
     private val netsBtn = Button()
     private val componentsBtn = Button()
+    private val schematicBtn = Button()
 
     // Выбор языка
     private val localeComboBox = ComboBox<I18n.LocaleType>().apply {
@@ -48,6 +49,7 @@ class ProjectsView {
     var onBomClick: (() -> Unit)? = null
     var onNetsClick: (() -> Unit)? = null
     var onComponentsClick: (() -> Unit)? = null
+    var onSchematicClick: (() -> Unit)? = null
     var onLocaleChange: ((I18n.LocaleType) -> Unit)? = null
 
     private val root = VBox(10.0).apply {
@@ -99,7 +101,7 @@ class ProjectsView {
         }
 
         // Кнопки модулей
-        val moduleButtons = HBox(10.0, bomBtn, netsBtn, componentsBtn).apply {
+        val moduleButtons = HBox(10.0, bomBtn, netsBtn, componentsBtn, schematicBtn).apply {
             alignment = Pos.CENTER_LEFT
             padding = Insets(5.0)
             style = "-fx-background-color: #f0f0f0; -fx-padding: 5;"
@@ -127,6 +129,7 @@ class ProjectsView {
         bomBtn.text = I18n.tr("projects.btn.bom")
         netsBtn.text = I18n.tr("projects.btn.nets")
         componentsBtn.text = I18n.tr("projects.btn.components")
+        schematicBtn.text = I18n.tr("projects.btn.schematic")
 
         // Обновляем Label в секциях
         val workspaceSection = root.children[0] as VBox
@@ -145,6 +148,7 @@ class ProjectsView {
         bomBtn.setOnAction { onBomClick?.invoke() }
         netsBtn.setOnAction { onNetsClick?.invoke() }
         componentsBtn.setOnAction { onComponentsClick?.invoke() }
+        schematicBtn.setOnAction { onSchematicClick?.invoke() }
 
         // Слушатель выбора языка
         localeComboBox.valueProperty().addListener { _, _, newLocale ->
@@ -202,5 +206,6 @@ class ProjectsView {
         bomBtn.isDisable = !enabled
         netsBtn.isDisable = !enabled
         componentsBtn.isDisable = !enabled
+        schematicBtn.isDisable = !enabled
     }
 }
