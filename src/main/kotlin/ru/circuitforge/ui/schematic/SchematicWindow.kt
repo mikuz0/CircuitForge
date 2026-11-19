@@ -11,10 +11,11 @@ import javafx.scene.canvas.GraphicsContext
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.ScrollPane
-import javafx.scene.input.KeyCode
+import javafx.scene.Cursor
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.*
 import javafx.scene.paint.Color
+import javafx.scene.shape.Circle
 import javafx.scene.shape.CubicCurve
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
@@ -47,9 +48,10 @@ class SchematicWindow : ProjectAware {
     private val bomRowsMap = mutableMapOf<String, BomRow>()
     private val componentsMap = mutableMapOf<String, Component>()
 
-    // UI контейнеры — 3 слоя
+    // UI контейнеры — 4 слоя
     private val canvas = Canvas(5000.0, 5000.0)          // задний: сетка
     private val linePane = Pane()                        // средний: кривые Безье
+    private val portPane = Pane()                        // слой для кружочков портов
     private val componentPane = Pane()                   // передний: компоненты
     private val mainPane = Pane()
     private val scrollPane = ScrollPane()
@@ -62,11 +64,17 @@ class SchematicWindow : ProjectAware {
     private var dragOffsetX: Double = 0.0
     private var dragOffsetY: Double = 0.0
 
-    // Режим фокуса — активен при нажатии на компонент
-    private var focusedNode: SchematicNode? = null
+    // Активные порты: Set<"refDes:pinNumber">
+    private val activePorts = mutableSetOf<String>()
 
-    // Map для хранения Group компонентов (для подсветки портов)
+    // Map для хранения Group компонентов
     private val componentGroups = mutableMapOf<String, Group>()
+
+    // Map кружочков портов: "refDes:pinNumber" -> Circle
+    private val portCircles = mutableMapOf<String, Circle>()
+
+    /** Ключ порта: "refDes:pinNumber" */
+    private fun portKey(refDes: String, pinNumber: String) = "$refDes:$pinNumber"
 
     init {
         stage.title = I18n.tr("schematic.window.title") ?: "Схема"
@@ -81,14 +89,20 @@ class SchematicWindow : ProjectAware {
         componentPane.isManaged = false
         componentPane.isPickOnBounds = false
 
-        // linePane — прозрачный, не перехватывает мышь
+        // Слой линий
         linePane.prefWidth = 5000.0
         linePane.prefHeight = 5000.0
         linePane.isManaged = false
         linePane.isPickOnBounds = false
 
-        // Основной Pane — 3 слоя: сетка (canvas), линии, компоненты
-        mainPane.children.setAll(canvas, linePane, componentPane)
+        // Слой кружочков
+        portPane.prefWidth = 5000.0
+        portPane.prefHeight = 5000.0
+        portPane.isManaged = false
+        portPane.isPickOnBounds = false
+
+        // Основной Pane — 4 слоя: сетка (canvas), линии, порты, компоненты
+        mainPane.children.setAll(canvas, linePane, portPane, componentPane)
         mainPane.prefWidth = 5000.0
         mainPane.prefHeight = 5000.0
 
@@ -126,6 +140,7 @@ class SchematicWindow : ProjectAware {
         bomRows.forEach { row -> bomRowsMap[row.bomnetId] = row }
         drawGridOnCanvas()
         drawComponents()
+        drawAllPorts() // <-- Рисуем кружочки один раз
     }
 
     private fun drawGridOnCanvas() {
@@ -168,59 +183,98 @@ class SchematicWindow : ProjectAware {
     }
 
     /**
-     * Рисует кривые Безье для всех цепей указанного компонента.
-     * Контрольные точки смещены перпендикулярно прямой между пинами,
-     * чтобы линии обходили компоненты и выглядели красиво.
+     * Рисует все кружочки портов на слое portPane.
      */
-    private fun drawFocusConnections(node: SchematicNode) {
-        linePane.children.clear()
+    private fun drawAllPorts() {
+        portPane.children.clear()
+        portCircles.clear()
 
-        // Находим все цепи, в которых участвует этот компонент
-        val refDes = bomRows.find { it.bomnetId == node.bomnetId }?.refDes ?: return
+        bomRowsMap.values.forEach { row ->
+            val node = nodesMap[row.bomnetId] ?: return@forEach
+            val comp = componentsMap[row.componentId] ?: return@forEach
+            val connectedPorts = getConnectedPorts(row.refDes, comp)
 
-        nets.forEach { net ->
-            val hasComponent = net.connections.any { conn -> conn.refDes == refDes }
-            if (!hasComponent) return@forEach
+            comp.ports.forEach { port ->
+                val key = portKey(row.refDes, port.pinNumber)
+                if (!connectedPorts.contains(key)) return@forEach
 
-            // Собираем все порты этой цепи
-            val connections = net.connections
-            val portCoords = mutableListOf<Pair<String, Pair<Double, Double>>>() // (refDes+pin, coords)
-
-            connections.forEach { conn ->
-                val row = bomRows.find { it.refDes == conn.refDes } ?: return@forEach
-                val coords = PortCalculator.getPortCoordinates(nodesMap, componentsMap, row, conn.pinNumber)
+                val coords = PortCalculator.getPortCoordinates(nodesMap, componentsMap, row, port.pinNumber)
                 if (coords != null) {
-                    portCoords.add("${conn.refDes}:${conn.pinNumber}" to coords)
+                    val circle = Circle(coords.first, coords.second, 5.0).apply {
+                        fill = if (activePorts.contains(key)) Color.web("#F44336") else Color.web("#2196F3")
+                        stroke = Color.web("#1976D2")
+                        strokeWidth = 1.5
+                        cursor = Cursor.HAND
+
+                        setOnMousePressed { event ->
+                            if (activePorts.contains(key)) {
+                                activePorts.remove(key)
+                            } else {
+                                activePorts.add(key)
+                            }
+                            drawAllPorts() // перерисовать цвет
+                            drawPortConnections(activePorts.toSet())
+                            event.consume()
+                        }
+                        setOnMouseEntered {
+                            if (!activePorts.contains(key)) this.fill = Color.web("#64B5F6")
+                        }
+                        setOnMouseExited {
+                            if (!activePorts.contains(key)) this.fill = Color.web("#2196F3")
+                        }
+                    }
+                    portPane.children.add(circle)
+                    portCircles[key] = circle
                 }
             }
+        }
+    }
 
-            if (portCoords.size < 2) return@forEach
+    /**
+     * Рисует кривые Безье для всех активных портов.
+     */
+    private fun drawPortConnections(activePorts: Set<String>) {
+        linePane.children.clear()
 
-            // Цвет цепи
-            val netColor = netColor(net.name)
+        activePorts.forEach { activeKey ->
+            val (activeRefDes, activePin) = activeKey.split(":", limit = 2)
 
-            // Рисуем кривые Безье: от фокусируемого компонента ко всем остальным
-            val focusPorts = portCoords.filter { it.first.startsWith("$refDes:") }
-            val otherPorts = portCoords.filter { !it.first.startsWith("$refDes:") }
+            nets.forEach { net ->
+                val hasActivePort = net.connections.any { conn ->
+                    conn.refDes == activeRefDes && conn.pinNumber == activePin
+                }
+                if (!hasActivePort) return@forEach
 
-            if (focusPorts.isEmpty() || otherPorts.isEmpty()) return@forEach
+                val portCoords = mutableListOf<Pair<String, Pair<Double, Double>>>()
+                net.connections.forEach { conn ->
+                    val row = bomRows.find { it.refDes == conn.refDes } ?: return@forEach
+                    val coords = PortCalculator.getPortCoordinates(nodesMap, componentsMap, row, conn.pinNumber)
+                    if (coords != null) {
+                        portCoords.add(portKey(conn.refDes, conn.pinNumber) to coords)
+                    }
+                }
 
-            // Для каждого пина фокусируемого компонента — кривая к каждому другому пину
-            focusPorts.forEach { focusPort ->
-                val focusStart = focusPort.second
+                if (portCoords.isEmpty()) return@forEach
 
-                otherPorts.forEach { otherPort ->
-                    val otherEnd = otherPort.second
+                val netColor = netColor(net.name)
+                val activePortKey = portKey(activeRefDes, activePin)
+                val activePortCoord = portCoords.find { it.first == activePortKey }
+                if (activePortCoord == null) return@forEach
 
-                    // Вычисляем контрольные точки для кривой Безье
-                    val cp1 = controlPoint(focusStart, otherEnd, offset = 60.0)
-                    val cp2 = controlPoint(otherEnd, focusStart, offset = 60.0)
+                val start = activePortCoord.second
+
+                portCoords.forEach { (portK, portC) ->
+                    if (portK == activePortKey) return@forEach
+
+                    val end = portC
+                    val cp1 = controlPoint(start, end, offset = 60.0)
+                    val cp2 = controlPoint(end, start, offset = 60.0)
 
                     val curve = CubicCurve(
-                        focusStart.first, focusStart.second,
+                        start.first, start.second,
                         cp1.first, cp1.second,
                         cp2.first, cp2.second,
-                        otherEnd.first, otherEnd.second
+                        end.first, end.second
                     ).apply {
                         stroke = netColor
                         fill = null
@@ -233,22 +287,15 @@ class SchematicWindow : ProjectAware {
         }
     }
 
-    /**
-     * Вычисляет контрольную точку для кривой Безье.
-     * Смещаем перпендикулярно прямой между start и end на offset пикселей.
-     * Это создаёт плавный изгиб, который обходит компоненты.
-     */
     private fun controlPoint(start: Pair<Double, Double>, end: Pair<Double, Double>, offset: Double): Pair<Double, Double> {
         val dx = end.first - start.first
         val dy = end.second - start.second
         val length = kotlin.math.hypot(dx, dy)
         if (length == 0.0) return Pair(start.first, start.second)
 
-        // Нормаль (перпендикуляр) к направлению
         val nx = -dy / length
         val ny = dx / length
 
-        // Контрольная точка на 1/3 пути + смещение по нормали
         val t = 0.33
         val midX = start.first + dx * t
         val midY = start.second + dy * t
@@ -256,11 +303,20 @@ class SchematicWindow : ProjectAware {
         return Pair(midX + nx * offset, midY + ny * offset)
     }
 
-    /** Генерирует стабильный цвет из имени цепи. */
     private fun netColor(name: String): Color {
         val hash = name.hashCode()
         val hue = (hash % 360 + 360) % 360.0 / 360.0
         return Color.hsb(hue * 360, 0.7, 0.8)
+    }
+
+    private fun getConnectedPorts(refDes: String, comp: Component): Set<String> {
+        val connected = mutableSetOf<String>()
+        nets.forEach { net ->
+            net.connections.filter { it.refDes == refDes }.forEach { conn ->
+                connected.add(portKey(refDes, conn.pinNumber))
+            }
+        }
+        return connected
     }
 
     private fun drawComponents() {
@@ -273,7 +329,6 @@ class SchematicWindow : ProjectAware {
             val comp = componentsMap[row.componentId] ?: return@forEach
             val group = Group()
 
-            // Используем ComponentRenderer
             when (comp.name.lowercase()) {
                 "resistor" -> ComponentRenderer.drawCustomResistor(group, row, comp)
                 "capacitor" -> ComponentRenderer.drawCustomCapacitor(group, row, comp)
@@ -284,12 +339,19 @@ class SchematicWindow : ProjectAware {
             group.layoutY = node.y
             group.rotate = node.rotation
 
-            // Обработчики мыши для контекстной визуализации
+            // Обработчики мыши на группе компонента
             group.setOnMousePressed { event ->
-                // Активируем режим фокуса
-                focusedNode = node
-                drawFocusConnections(node)
+                // Проверяем, не клик ли был на кружочке
+                val target = event.target
+                val isPortCircle = portCircles.values.any { it == target }
 
+                if (!isPortCircle) {
+                    // Активируем все порты компонента
+                    val connectedPorts = getConnectedPorts(row.refDes, comp)
+                    activePorts.addAll(connectedPorts)
+                    drawAllPorts()
+                    drawPortConnections(activePorts.toSet())
+                }
                 // Начинаем перетаскивание
                 dragNode = node
                 dragOffsetX = event.sceneX - group.layoutX
@@ -316,18 +378,19 @@ class SchematicWindow : ProjectAware {
                     group.layoutX = snappedX
                     group.layoutY = snappedY
 
-                    // Если фокус активен — обновляем линии
-                    if (focusedNode != null) {
-                        drawFocusConnections(focusedNode!!)
-                    }
+                    // Перерисовываем кружочки и линии
+                    drawAllPorts()
+                    drawPortConnections(activePorts.toSet())
                 }
                 event.consume()
             }
 
             group.setOnMouseReleased { event ->
-                // Деактивируем режим фокуса
-                focusedNode = null
-                linePane.children.clear()
+                // Деактивируем порты этого компонента
+                val connectedPorts = getConnectedPorts(row.refDes, comp)
+                activePorts.removeAll(connectedPorts)
+                drawAllPorts()
+                drawPortConnections(activePorts.toSet())
                 dragNode = null
                 saveSchematicAsync()
                 event.consume()
