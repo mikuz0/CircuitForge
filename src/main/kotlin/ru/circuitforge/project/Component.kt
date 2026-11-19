@@ -14,7 +14,19 @@ data class Component(
     val description: String = "",
     val model3dPath: String? = null,
     val refPrefix: String = "",
-    val ports: List<Port> = emptyList()
+    val ports: List<Port> = emptyList(),
+    val mainProperties: List<Property> = emptyList(),
+    val extraProperties: List<Property> = emptyList()
+)
+
+/**
+ * Свойство компонента (ключ/значение/единица измерения).
+ */
+@Serializable
+data class Property(
+    val key: String = "",
+    val value: String = "",
+    val unit: String = ""
 )
 
 /**
@@ -39,5 +51,7 @@ data class ComponentSummary(
     val name: String,
     val description: String,
     val refPrefix: String,
-    val portsCount: Int = 0
+    val portsCount: Int = 0,
+    val mainPropertiesCount: Int = 0,
+    val extraPropertiesCount: Int = 0
 )

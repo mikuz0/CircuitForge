@@ -38,15 +38,24 @@ object ComponentRepository {
      * Создаёт новый компонент и сохраняет в файл.
      * @return slug созданного компонента
      */
-    fun createComponent(projectDir: Path, name: String, description: String, refPrefix: String, ports: List<Port> = emptyList()): String {
+    fun createComponent(
+        projectDir: Path,
+        name: String,
+        description: String,
+        refPrefix: String,
+        ports: List<Port> = emptyList(),
+        mainProperties: List<Property> = emptyList(),
+        extraProperties: List<Property> = emptyList()
+    ): String {
         val slug = generateUniqueSlug(projectDir, name)
         val component = Component(
             schemaVersion = 1,
-
             name = name,
             description = description,
             refPrefix = refPrefix,
-            ports = ports
+            ports = ports,
+            mainProperties = mainProperties,
+            extraProperties = extraProperties
         )
         val path = projectDir.resolve("components").resolve("${slug}$CFCOMP_EXT")
         save(path, component)
@@ -65,7 +74,9 @@ object ComponentRepository {
         name: String,
         description: String,
         refPrefix: String,
-        ports: List<Port>
+        ports: List<Port>,
+        mainProperties: List<Property> = emptyList(),
+        extraProperties: List<Property> = emptyList()
     ): String {
         val componentsDir = projectDir.resolve("components")
         val oldPath = componentsDir.resolve("${originalSlug}$CFCOMP_EXT")
@@ -92,7 +103,9 @@ object ComponentRepository {
             name = name,
             description = description,
             refPrefix = refPrefix,
-            ports = ports
+            ports = ports,
+            mainProperties = mainProperties,
+            extraProperties = extraProperties
         )
 
         // 4. Переименовываем файл при необходимости
@@ -159,7 +172,9 @@ object ComponentRepository {
                                 name = comp.name,
                                 description = comp.description,
                                 refPrefix = comp.refPrefix,
-                                portsCount = comp.ports.size
+                                portsCount = comp.ports.size,
+                                mainPropertiesCount = comp.mainProperties.size,
+                                extraPropertiesCount = comp.extraProperties.size
                             )
                             components.add(summary)
                         } catch (e: Exception) {
