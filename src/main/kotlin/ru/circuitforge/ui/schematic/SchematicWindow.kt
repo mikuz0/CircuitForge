@@ -11,9 +11,11 @@ import javafx.scene.canvas.GraphicsContext
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.ScrollPane
+import javafx.scene.input.KeyCode
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.*
 import javafx.scene.paint.Color
+import javafx.scene.shape.CubicCurve
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
 import ru.circuitforge.i18n.I18n
@@ -25,7 +27,7 @@ import java.util.concurrent.Executors
 
 /**
  * Окно редактора схемы.
- * Отвечает только за UI и координацию между компонентами.
+ * Контекстная визуализация: линии связей показываются только при нажатии на компонент.
  */
 class SchematicWindow : ProjectAware {
     private val logger = LoggerFactory.getLogger(SchematicWindow::class.java)
@@ -39,16 +41,16 @@ class SchematicWindow : ProjectAware {
     private val bomRows = FXCollections.observableArrayList<BomRow>()
     private val nets = FXCollections.observableArrayList<Net>()
     private val schematicNodes = FXCollections.observableArrayList<SchematicNode>()
-    private val netPaths = FXCollections.observableArrayList<NetPath>()
 
     // Map для быстрого доступа
     private val nodesMap = mutableMapOf<String, SchematicNode>()
     private val bomRowsMap = mutableMapOf<String, BomRow>()
     private val componentsMap = mutableMapOf<String, Component>()
 
-    // UI контейнеры
-    private val canvas = Canvas(5000.0, 5000.0)
-    private val componentPane = Pane()
+    // UI контейнеры — 3 слоя
+    private val canvas = Canvas(5000.0, 5000.0)          // задний: сетка
+    private val linePane = Pane()                        // средний: кривые Безье
+    private val componentPane = Pane()                   // передний: компоненты
     private val mainPane = Pane()
     private val scrollPane = ScrollPane()
     private val saveButton = Button(I18n.tr("bom.btn.save") ?: "Сохранить")
@@ -60,19 +62,11 @@ class SchematicWindow : ProjectAware {
     private var dragOffsetX: Double = 0.0
     private var dragOffsetY: Double = 0.0
 
-    // Редактор проводов (делегирование)
-    private val wireEditor: WireEditor by lazy {
-        WireEditor(
-            nets = nets,
-            netPaths = netPaths,
-            bomRows = bomRows,
-            nodesMap = nodesMap,
-            componentsMap = componentsMap,
-            projectPath = projectPath,
-            executor = executor,
-            onSave = { drawLines(); saveSchematicAsync() }
-        )
-    }
+    // Режим фокуса — активен при нажатии на компонент
+    private var focusedNode: SchematicNode? = null
+
+    // Map для хранения Group компонентов (для подсветки портов)
+    private val componentGroups = mutableMapOf<String, Group>()
 
     init {
         stage.title = I18n.tr("schematic.window.title") ?: "Схема"
@@ -81,19 +75,20 @@ class SchematicWindow : ProjectAware {
     }
 
     private fun setupLayout() {
-        // Обработчики мыши на Canvas делегируем в WireEditor
-        canvas.addEventHandler(MouseEvent.MOUSE_PRESSED)  { wireEditor.handleMousePressed(it) }
-        canvas.addEventHandler(MouseEvent.MOUSE_DRAGGED)  { wireEditor.handleMouseDragged(it) }
-        canvas.addEventHandler(MouseEvent.MOUSE_RELEASED) { wireEditor.handleMouseReleased(it) }
-
         // Слой компонентов
         componentPane.prefWidth = 5000.0
         componentPane.prefHeight = 5000.0
         componentPane.isManaged = false
         componentPane.isPickOnBounds = false
 
-        // Основной Pane
-        mainPane.children.setAll(canvas, componentPane)
+        // linePane — прозрачный, не перехватывает мышь
+        linePane.prefWidth = 5000.0
+        linePane.prefHeight = 5000.0
+        linePane.isManaged = false
+        linePane.isPickOnBounds = false
+
+        // Основной Pane — 3 слоя: сетка (canvas), линии, компоненты
+        mainPane.children.setAll(canvas, linePane, componentPane)
         mainPane.prefWidth = 5000.0
         mainPane.prefHeight = 5000.0
 
@@ -129,22 +124,17 @@ class SchematicWindow : ProjectAware {
         schematicNodes.forEach { node -> nodesMap[node.bomnetId] = node }
         bomRowsMap.clear()
         bomRows.forEach { row -> bomRowsMap[row.bomnetId] = row }
-        wireEditor.reset()
-        drawLines()
+        drawGridOnCanvas()
         drawComponents()
     }
 
-    private fun drawLines() {
+    private fun drawGridOnCanvas() {
         val gc = canvas.graphicsContext2D
         val width = canvas.width
         val height = canvas.height
         gc.fill = Color.WHITE
         gc.fillRect(0.0, 0.0, width, height)
-        drawGrid(gc)
-        drawConnections(gc)
-    }
 
-    private fun drawGrid(gc: GraphicsContext) {
         val minorStep = 12.5
         val majorStep = 50.0
 
@@ -177,95 +167,113 @@ class SchematicWindow : ProjectAware {
         }
     }
 
-    private fun drawConnections(gc: GraphicsContext) {
-        gc.lineWidth = 2.0
-        gc.stroke = Color.web("#2196F3")
+    /**
+     * Рисует кривые Безье для всех цепей указанного компонента.
+     * Контрольные точки смещены перпендикулярно прямой между пинами,
+     * чтобы линии обходили компоненты и выглядели красиво.
+     */
+    private fun drawFocusConnections(node: SchematicNode) {
+        linePane.children.clear()
 
-        // 1. Пользовательские пути (с waypoints)
-        netPaths.forEach { netPath ->
-            val net = nets.find { it.name == netPath.netName } ?: return@forEach
-            if (netPath.waypoints.isEmpty()) return@forEach
+        // Находим все цепи, в которых участвует этот компонент
+        val refDes = bomRows.find { it.bomnetId == node.bomnetId }?.refDes ?: return
 
-            val pinPoints = getNetPoints(net)
-            if (pinPoints.isNotEmpty()) {
-                // От первого пина до первой точки излома
-                val firstPin = pinPoints[0]
-                val firstWP = netPath.waypoints[0]
-                drawOrthogonalLine(gc, firstPin, Pair(firstWP.x, firstWP.y))
-
-                // Между точками излома
-                for (i in 1 until netPath.waypoints.size) {
-                    val prev = netPath.waypoints[i - 1]
-                    val curr = netPath.waypoints[i]
-                    drawOrthogonalLine(gc, Pair(prev.x, prev.y), Pair(curr.x, curr.y))
-                }
-
-                // От последней точки излома до последнего пина
-                if (pinPoints.size > 1) {
-                    val lastPin = pinPoints.last()
-                    val lastWP = netPath.waypoints.last()
-                    drawOrthogonalLine(gc, Pair(lastWP.x, lastWP.y), lastPin)
-                }
-            }
-        }
-
-        // 2. Рисуем маркеры точек излома ОДИН РАЗ для всех путей (ВЫНЕСЕНО ИЗ ЦИКЛА!)
-        wireEditor.drawWaypointMarkers(gc, netPaths)
-
-        // 3. Автоматические пути (без пользовательских waypoints)
         nets.forEach { net ->
-            // Пропускаем, если для этой цепи уже есть пользовательский путь
-            if (netPaths.any { it.netName == net.name }) return@forEach
-            if (net.connections.isEmpty()) return@forEach
+            val hasComponent = net.connections.any { conn -> conn.refDes == refDes }
+            if (!hasComponent) return@forEach
 
-            val points = getNetPoints(net)
-            if (points.size >= 2) {
-                // Рисуем линии от первого пина ко всем остальным (звездообразная топология)
-                val startPoint = points[0]
-                for (i in 1 until points.size) {
-                    val endPoint = points[i]
-                    drawOrthogonalLine(gc, startPoint, endPoint)
-                }
-            } else if (points.size == 1) {
-                drawConnectionDot(gc, points[0])
-            }
-        }
-    }
+            // Собираем все порты этой цепи
+            val connections = net.connections
+            val portCoords = mutableListOf<Pair<String, Pair<Double, Double>>>() // (refDes+pin, coords)
 
-    private fun getNetPoints(net: Net): List<Pair<Double, Double>> {
-        val points = mutableListOf<Pair<Double, Double>>()
-        net.connections.forEach { conn ->
-            val row = bomRows.find { it.refDes == conn.refDes }
-            if (row != null) {
-                val coords = wireEditor.getPortCoordinates(row, conn.pinNumber)
+            connections.forEach { conn ->
+                val row = bomRows.find { it.refDes == conn.refDes } ?: return@forEach
+                val coords = PortCalculator.getPortCoordinates(nodesMap, componentsMap, row, conn.pinNumber)
                 if (coords != null) {
-                    points.add(coords)
+                    portCoords.add("${conn.refDes}:${conn.pinNumber}" to coords)
+                }
+            }
+
+            if (portCoords.size < 2) return@forEach
+
+            // Цвет цепи
+            val netColor = netColor(net.name)
+
+            // Рисуем кривые Безье: от фокусируемого компонента ко всем остальным
+            val focusPorts = portCoords.filter { it.first.startsWith("$refDes:") }
+            val otherPorts = portCoords.filter { !it.first.startsWith("$refDes:") }
+
+            if (focusPorts.isEmpty() || otherPorts.isEmpty()) return@forEach
+
+            // Для каждого пина фокусируемого компонента — кривая к каждому другому пину
+            focusPorts.forEach { focusPort ->
+                val focusStart = focusPort.second
+
+                otherPorts.forEach { otherPort ->
+                    val otherEnd = otherPort.second
+
+                    // Вычисляем контрольные точки для кривой Безье
+                    val cp1 = controlPoint(focusStart, otherEnd, offset = 60.0)
+                    val cp2 = controlPoint(otherEnd, focusStart, offset = 60.0)
+
+                    val curve = CubicCurve(
+                        focusStart.first, focusStart.second,
+                        cp1.first, cp1.second,
+                        cp2.first, cp2.second,
+                        otherEnd.first, otherEnd.second
+                    ).apply {
+                        stroke = netColor
+                        fill = null
+                        strokeWidth = 2.0
+                        opacity = 0.7
+                    }
+                    linePane.children.add(curve)
                 }
             }
         }
-        return points
     }
 
-    private fun drawOrthogonalLine(gc: GraphicsContext, start: Pair<Double, Double>, end: Pair<Double, Double>) {
-        val (x1, y1) = start
-        val (x2, y2) = end
-        gc.strokeLine(x1, y1, x2, y1)
-        gc.strokeLine(x2, y1, x2, y2)
+    /**
+     * Вычисляет контрольную точку для кривой Безье.
+     * Смещаем перпендикулярно прямой между start и end на offset пикселей.
+     * Это создаёт плавный изгиб, который обходит компоненты.
+     */
+    private fun controlPoint(start: Pair<Double, Double>, end: Pair<Double, Double>, offset: Double): Pair<Double, Double> {
+        val dx = end.first - start.first
+        val dy = end.second - start.second
+        val length = kotlin.math.hypot(dx, dy)
+        if (length == 0.0) return Pair(start.first, start.second)
+
+        // Нормаль (перпендикуляр) к направлению
+        val nx = -dy / length
+        val ny = dx / length
+
+        // Контрольная точка на 1/3 пути + смещение по нормали
+        val t = 0.33
+        val midX = start.first + dx * t
+        val midY = start.second + dy * t
+
+        return Pair(midX + nx * offset, midY + ny * offset)
     }
 
-    private fun drawConnectionDot(gc: GraphicsContext, point: Pair<Double, Double>) {
-        gc.fill = Color.web("#2196F3")
-        gc.fillOval(point.first - 4.0, point.second - 4.0, 8.0, 8.0)
+    /** Генерирует стабильный цвет из имени цепи. */
+    private fun netColor(name: String): Color {
+        val hash = name.hashCode()
+        val hue = (hash % 360 + 360) % 360.0 / 360.0
+        return Color.hsb(hue * 360, 0.7, 0.8)
     }
 
     private fun drawComponents() {
         componentPane.children.clear()
+        linePane.children.clear()
+        componentGroups.clear()
+
         bomRowsMap.values.forEach { row ->
             val node = nodesMap[row.bomnetId] ?: return@forEach
             val comp = componentsMap[row.componentId] ?: return@forEach
             val group = Group()
 
-            // Используем ComponentRenderer вместо дублирования кода
+            // Используем ComponentRenderer
             when (comp.name.lowercase()) {
                 "resistor" -> ComponentRenderer.drawCustomResistor(group, row, comp)
                 "capacitor" -> ComponentRenderer.drawCustomCapacitor(group, row, comp)
@@ -274,45 +282,59 @@ class SchematicWindow : ProjectAware {
 
             group.layoutX = node.x
             group.layoutY = node.y
+            group.rotate = node.rotation
 
-            // Drag & Drop компонентов
+            // Обработчики мыши для контекстной визуализации
             group.setOnMousePressed { event ->
+                // Активируем режим фокуса
+                focusedNode = node
+                drawFocusConnections(node)
+
+                // Начинаем перетаскивание
                 dragNode = node
                 dragOffsetX = event.sceneX - group.layoutX
                 dragOffsetY = event.sceneY - group.layoutY
                 group.toFront()
+                event.consume()
             }
+
             group.setOnMouseDragged { event ->
                 val currentNode = dragNode
                 if (currentNode != null) {
-                    // 1. Получаем "сырые" координаты
                     val rawX = event.sceneX - dragOffsetX
                     val rawY = event.sceneY - dragOffsetY
 
-                    // 2. Привязываем к сетке (шаг 12.5)
                     val gridStep = 12.5
                     val snappedX = kotlin.math.round(rawX / gridStep) * gridStep
                     val snappedY = kotlin.math.round(rawY / gridStep) * gridStep
 
-                    // 3. Обновляем модель
-                    val updatedNode = currentNode.copy(x = snappedX, y = snappedY)
+                    val updatedNode = currentNode.copy(x = snappedX, y = snappedY, rotation = currentNode.rotation)
                     nodesMap[currentNode.bomnetId] = updatedNode
                     val idx = schematicNodes.indexOfFirst { it.bomnetId == currentNode.bomnetId }
                     if (idx >= 0) schematicNodes[idx] = updatedNode
 
-                    // 4. Двигаем группу
                     group.layoutX = snappedX
                     group.layoutY = snappedY
 
-                    // 5. Перерисовываем линии
-                    drawLines()
+                    // Если фокус активен — обновляем линии
+                    if (focusedNode != null) {
+                        drawFocusConnections(focusedNode!!)
+                    }
                 }
+                event.consume()
             }
-            group.setOnMouseReleased {
+
+            group.setOnMouseReleased { event ->
+                // Деактивируем режим фокуса
+                focusedNode = null
+                linePane.children.clear()
                 dragNode = null
                 saveSchematicAsync()
+                event.consume()
             }
+
             componentPane.children.add(group)
+            componentGroups[row.bomnetId] = group
         }
     }
 
@@ -328,7 +350,8 @@ class SchematicWindow : ProjectAware {
                 SchematicNode(
                     bomnetId = row.bomnetId,
                     x = 100.0 + col * stepX,
-                    y = 100.0 + rowIdx * stepY
+                    y = 100.0 + rowIdx * stepY,
+                    rotation = 0.0
                 )
             )
         }
@@ -341,8 +364,7 @@ class SchematicWindow : ProjectAware {
                 projectPath?.let { dir ->
                     val doc = SchematicDocument(
                         schemaVersion = 1,
-                        nodes = schematicNodes.toList(),
-                        paths = netPaths.toList()
+                        nodes = schematicNodes.toList()
                     )
                     SchematicRepository.save(dir, doc)
                 }
@@ -376,8 +398,7 @@ class SchematicWindow : ProjectAware {
                 projectPath?.let { dir ->
                     val doc = SchematicDocument(
                         schemaVersion = 1,
-                        nodes = schematicNodes.toList(),
-                        paths = netPaths.toList()
+                        nodes = schematicNodes.toList()
                     )
                     SchematicRepository.save(dir, doc)
                 }
@@ -398,7 +419,6 @@ class SchematicWindow : ProjectAware {
         projectPath?.let { dir ->
             val doc = SchematicRepository.load(dir)
             schematicNodes.setAll(doc.nodes)
-            netPaths.setAll(doc.paths)
             drawSchematic()
             statusLabel.text = I18n.tr("net.status.reverted") ?: "Отменено"
             statusLabel.style = "-fx-text-fill: blue;"
@@ -441,8 +461,6 @@ class SchematicWindow : ProjectAware {
                 } else {
                     schematicNodes.setAll(existingDoc.nodes)
                 }
-
-                netPaths.setAll(existingDoc.paths)
             }
 
             override fun succeeded() {
