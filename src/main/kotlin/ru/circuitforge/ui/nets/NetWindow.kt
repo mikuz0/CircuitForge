@@ -237,82 +237,37 @@ class NetWindow : ProjectAware {
             return
         }
 
-        val bomItems = projectPaths?.let { BomRepository.load(it).items } ?: emptyList()
-        if (bomItems.isEmpty()) {
-            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.no.bom"))
+        val paths = projectPaths ?: return
+        val selectedNet = nets[selectedNetIndex]
+
+        // Проверяем, что BOM не пустой
+        val bomRows = BomRepository.loadRows(paths)
+        if (bomRows.isEmpty()) {
+            UiUtils.errorAlert(
+                I18n.tr("common.alert.error"),
+                I18n.tr("nets.dialog.add.connection.no.bom") ?: "BOM пуст. Сначала создайте BOM в редакторе."
+            )
             return
         }
 
-        val refDesComboBox = ComboBox<BomItem>().apply {
-            items.setAll(bomItems)
-            cellFactory = javafx.util.Callback { _: ListView<BomItem> ->
-                object : ListCell<BomItem>() {
-                    override fun updateItem(item: BomItem?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        text = if (empty || item == null) null else item.refDes
-                    }
-                }
-            }
-        }
-        val pinComboBox = ComboBox<String>()
+        AddConnectionDialog(
+            ownerStage = stage,
+            projectPaths = paths,
+            currentNet = selectedNet,
+            allNets = nets.toList()
+        ) { connection ->
+            // Добавляем соединение к текущей цепи
+            val currentNet = nets[selectedNetIndex]
+            val updatedNet = currentNet.copy(connections = currentNet.connections + connection)
+            nets[selectedNetIndex] = updatedNet
+            connectionsList.setAll(updatedNet.connections.toList())
+            markDirty()
+            refreshMatrix()
+            logger.info("Connection added: ${connection.refDes}.${connection.pinNumber}")
 
-        refDesComboBox.valueProperty().addListener { _, _, newRefDes ->
-            pinComboBox.items.clear()
-            if (newRefDes != null && projectPaths != null) {
-                try {
-                    val comp = ComponentRepository.loadComponent(projectPaths!!.projectDir, newRefDes.componentSlug)
-                    pinComboBox.items.setAll(comp.ports.map { it.pinNumber })
-                } catch (e: Exception) {
-                    logger.warn("Failed to load component", e)
-                }
-            }
-        }
-
-        // ИЗМЕНЕНИЕ: Dialog<ButtonType> вместо Dialog<Unit>
-        val dialog = Dialog<ButtonType>()
-        dialog.title = I18n.tr("net.dialog.add.connection")
-        dialog.headerText = I18n.tr("net.dialog.select.connection")
-        dialog.dialogPane.buttonTypes.setAll(ButtonType.OK, ButtonType.CANCEL)
-
-        val grid = GridPane()
-        grid.hgap = 10.0
-        grid.vgap = 8.0
-        grid.padding = Insets(10.0)
-        GridPane.setConstraints(Label(I18n.tr("net.label.ref.des")), 0, 0)
-        GridPane.setConstraints(refDesComboBox, 1, 0)
-        GridPane.setConstraints(Label(I18n.tr("net.label.pin")), 0, 1)
-        GridPane.setConstraints(pinComboBox, 1, 1)
-        grid.children.setAll(
-            Label(I18n.tr("net.label.ref.des")), refDesComboBox,
-            Label(I18n.tr("net.label.pin")), pinComboBox
-        )
-        dialog.dialogPane.content = grid
-
-        dialog.dialogPane.lookupButton(ButtonType.OK).disableProperty().bind(
-            refDesComboBox.valueProperty().isNull().or(pinComboBox.valueProperty().isNull())
-        )
-
-        // ИЗМЕНЕНИЕ: Используем resultProperty().orElse(CANCEL) == OK
-        val result = dialog.showAndWait().orElse(ButtonType.CANCEL)
-
-        if (result == ButtonType.OK) {
-            val selectedRefDes = refDesComboBox.value
-            val selectedPin = pinComboBox.value
-            if (selectedRefDes != null && selectedPin != null) {
-                val connection = NetConnection(refDes = selectedRefDes.refDes, pinNumber = selectedPin)
-                val currentNet = nets[selectedNetIndex]
-                if (currentNet.connections.any { it.refDes == connection.refDes && it.pinNumber == connection.pinNumber }) {
-                    UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.connection.exists"))
-                    return
-                }
-                val updatedNet = currentNet.copy(connections = currentNet.connections + connection)
-                nets[selectedNetIndex] = updatedNet
-                connectionsList.setAll(updatedNet.connections.toList())
-                markDirty()
-                refreshMatrix()
-                logger.info("Connection added: ${connection.refDes}.${connection.pinNumber}")
-            }
-        }
+            // Автоматически сохраняем
+            saveNetsAsync()
+        }.show()
     }
 
     private fun deleteConnection() {
@@ -473,6 +428,24 @@ class NetWindow : ProjectAware {
             statusLabel.text = I18n.tr("net.status.save.failed")
             statusLabel.style = "-fx-text-fill: red;"
             logger.error("Failed to save netlist", ex)
+        }
+        executor.submit(task)
+    }
+
+    /** Асинхронное сохранение без обновления snapshot (для автосохранения после добавления соединения). */
+    private fun saveNetsAsync() {
+        val task = object : javafx.concurrent.Task<Unit>() {
+            override fun call() {
+                projectPaths?.let { paths ->
+                    NetRepository.save(paths, NetDocument(schemaVersion = 1, nets = nets.toList()))
+                }
+            }
+            override fun succeeded() {
+                logger.info("Netlist auto-saved after connection add")
+            }
+            override fun failed() {
+                logger.error("Failed to auto-save netlist", exception)
+            }
         }
         executor.submit(task)
     }
