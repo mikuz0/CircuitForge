@@ -29,7 +29,6 @@ object ProjectRepository {
      */
     @Throws(IllegalArgumentException::class)
     fun create(name: String, workspace: Path): Path {
-        // Валидация имени
         if (name.isBlank()) {
             throw IllegalArgumentException("Project name cannot be blank")
         }
@@ -37,20 +36,19 @@ object ProjectRepository {
             throw IllegalArgumentException("Project name cannot contain '/' or '\\'")
         }
 
-        val projectDir = workspace.resolve(name)
+        val machineName = generateMachineName(name)
+        val projectDir = workspace.resolve(machineName)
         if (Files.exists(projectDir)) {
             throw IllegalArgumentException("Project '$name' already exists at $projectDir")
         }
 
-        // Создаём полную структуру папок
         Files.createDirectories(projectDir)
         Files.createDirectories(projectDir.resolve("components"))
         Files.createDirectories(projectDir.resolve("nets"))
         Files.createDirectories(projectDir.resolve("exports"))
 
-        // Создаём файл проекта
         val projectFile = projectDir.resolve(PROJECT_FILE_NAME)
-        val project = Project(name = name)
+        val project = Project(name = name, machineName = machineName)
         save(projectFile, project)
 
         logger.info("Project created: $projectFile")
@@ -80,7 +78,23 @@ object ProjectRepository {
             throw e
         }
     }
-
+    /**
+     * Генерирует машинное имя проекта: lowercase, пробелы -> '-',
+     * только a-z0-9-, схлопывание '-', trim '-'.
+     */
+    @Throws(IllegalArgumentException::class)
+    fun generateMachineName(name: String): String {
+        val base = name.lowercase()
+            .replace(' ', '-')
+            .replace(Regex("[^a-z0-9-]"), "")
+            .replace(Regex("-+"), "-")
+            .removePrefix("-")
+            .removeSuffix("-")
+        if (base.isBlank()) {
+            throw IllegalArgumentException("Project name must contain at least one letter or digit")
+        }
+        return base
+    }
     /**
      * Сканирует директорию на наличие файлов проектов.
      * Возвращает список ProjectInfo, отсортированный по имени.
@@ -94,7 +108,8 @@ object ProjectRepository {
                         val projectFile = dir.resolve(PROJECT_FILE_NAME)
                         if (Files.exists(projectFile)) {
                             try {
-                                projects.add(ProjectInfo(dir.fileName.toString(), dir))
+                                val project = load(projectFile)
+                                projects.add(ProjectInfo(project.name, project.machineName, dir))
                             } catch (e: Exception) {
                                 logger.warn("Failed to load project from $dir, skipping", e)
                             }

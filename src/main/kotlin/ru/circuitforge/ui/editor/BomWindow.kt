@@ -330,7 +330,7 @@ class BomWindow : ProjectAware {
 
         val task = object : javafx.concurrent.Task<Unit>() {
             override fun call() {
-                projectPath?.let { dir ->
+                projectPaths?.let { paths ->
                     val items = numberedRows.map { row ->
                         BomItem(
                             bomnetId = row.bomnetId,
@@ -341,7 +341,7 @@ class BomWindow : ProjectAware {
                             comment = row.comment
                         )
                     }
-                    BomRepository.save(dir, BomDocument(schemaVersion = 1, items = items))
+                    BomRepository.save(paths, BomDocument(schemaVersion = 1, items = items))
                     savedSnapshot = serializeCurrentState()
                 }
             }
@@ -358,8 +358,8 @@ class BomWindow : ProjectAware {
     }
 
     private fun revertChanges() {
-        projectPath?.let { dir ->
-            val rows = BomRepository.loadRows(dir)
+        projectPaths?.let { paths ->
+            val rows = BomRepository.loadRows(paths)
             bomRows.setAll(rows)
             savedSnapshot = serializeCurrentState()
             statusLabel.text = "Отменено"
@@ -378,14 +378,21 @@ class BomWindow : ProjectAware {
     override fun showWindow() = stage.show()
 
     override fun openProject(projectPath: Path) {
-        this.projectPath = projectPath
-        stage.title = "CircuitForge — BOM — $projectPath"
+        try {
+            val project = ProjectRepository.load(projectPath.resolve("project.cfproj"))
+            val paths = ProjectPaths(projectPath, project.machineName)
+            this.projectPaths = paths
+            stage.title = "CircuitForge — BOM — $projectPath"
 
-        val rows = BomRepository.loadRows(projectPath)
-        bomRows.setAll(rows)
-        savedSnapshot = serializeCurrentState()
-        statusLabel.text = "Загружено: ${rows.size} элементов"
-        logger.info("BOM opened: $projectPath, ${rows.size} items")
+            val rows = BomRepository.loadRows(paths)
+            bomRows.setAll(rows)
+            savedSnapshot = serializeCurrentState()
+            statusLabel.text = "Загружено: ${rows.size} элементов"
+            logger.info("BOM opened: $projectPath, ${rows.size} items")
+        } catch (e: Exception) {
+            logger.error("Failed to open project at $projectPath", e)
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), "Не удалось открыть проект: ${e.message}")
+        }
     }
 
     override fun getStage(): Stage = stage

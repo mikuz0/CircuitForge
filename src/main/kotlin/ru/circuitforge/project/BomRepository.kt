@@ -18,8 +18,8 @@ object BomRepository {
     }
 
     /** Загружает BOM документ из файла проекта. Возвращает пустой при отсутствии. */
-    fun load(projectPath: Path): BomDocument {
-        val bomPath = projectPath.resolve(BOM_FILE_NAME)
+    fun load(paths: ProjectPaths): BomDocument {
+        val bomPath = paths.bom
         return try {
             val content = Files.readString(bomPath)
             json.decodeFromString(BomDocument.serializer(), content)
@@ -30,15 +30,15 @@ object BomRepository {
     }
 
     /** Сохраняет BOM документ в файл проекта. */
-    fun save(projectPath: Path, bom: BomDocument) {
+    fun save(paths: ProjectPaths, bom: BomDocument) {
         try {
-            val bomPath = projectPath.resolve(BOM_FILE_NAME)
+            val bomPath = paths.bom
             Files.createDirectories(bomPath.parent)
             val jsonStr = json.encodeToString(BomDocument.serializer(), bom)
             Files.writeString(bomPath, jsonStr)
             logger.info("BOM saved to $bomPath")
         } catch (e: Exception) {
-            logger.error("Failed to save BOM to ${projectPath.resolve(BOM_FILE_NAME)}", e)
+            logger.error("Failed to save BOM to ${paths.bom}", e)
             throw e
         }
     }
@@ -47,8 +47,8 @@ object BomRepository {
      * Создаёт новый BOM-документ из всех компонентов проекта.
      * Каждый компонент становится одной строкой BOM с авто-сгенерированным RefDes.
      */
-    fun initFromComponents(projectPath: Path): BomDocument {
-        val componentsDir = projectPath.resolve("components")
+    fun initFromComponents(paths: ProjectPaths): BomDocument {
+        val componentsDir = paths.componentsDir
         if (!Files.exists(componentsDir)) {
             logger.warn("No components directory found at $componentsDir")
             return BomDocument()
@@ -89,8 +89,8 @@ object BomRepository {
     /**
      * Загружает строки BOM с подтягиванием имён компонентов по UUID.
      */
-    fun loadRows(projectPath: Path): List<BomRow> {
-        val bomDoc = load(projectPath)
+    fun loadRows(paths: ProjectPaths): List<BomRow> {
+        val bomDoc = load(paths)
         val rows = mutableListOf<BomRow>()
 
         bomDoc.items.forEach { item ->
@@ -98,13 +98,12 @@ object BomRepository {
             var prefix = "?"
             var slug = item.componentSlug
             try {
-                val comp = ComponentRepository.loadComponentById(projectPath, item.componentId)
+                val comp = ComponentRepository.loadComponentById(paths.projectDir, item.componentId)
                 if (comp != null) {
                     compName = comp.name
                     prefix = comp.refPrefix
-                    // Resolve slug from component filename if not already set
                     if (slug.isBlank()) {
-                        val componentsDir = projectPath.resolve("components")
+                        val componentsDir = paths.componentsDir
                         if (Files.exists(componentsDir)) {
                             Files.list(componentsDir).use { stream ->
                                 stream.filter { it.fileName.toString().endsWith(".cfcomp") }

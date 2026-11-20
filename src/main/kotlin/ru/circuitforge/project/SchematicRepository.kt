@@ -18,8 +18,8 @@ object SchematicRepository {
     }
 
     /** Загружает документ схемы. Возвращает пустой при отсутствии. */
-    fun load(projectPath: Path): SchematicDocument {
-        val schematicPath = projectPath.resolve(SCHEMATIC_FILE_NAME)
+    fun load(paths: ProjectPaths): SchematicDocument {
+        val schematicPath = paths.schematic
         return try {
             val content = Files.readString(schematicPath)
             json.decodeFromString(SchematicDocument.serializer(), content)
@@ -28,17 +28,16 @@ object SchematicRepository {
             SchematicDocument()
         }
     }
-
     /** Сохраняет документ схемы. */
-    fun save(projectPath: Path, doc: SchematicDocument) {
+    fun save(paths: ProjectPaths, doc: SchematicDocument) {
         try {
-            val schematicPath = projectPath.resolve(SCHEMATIC_FILE_NAME)
+            val schematicPath = paths.schematic
             Files.createDirectories(schematicPath.parent)
             val jsonStr = json.encodeToString(SchematicDocument.serializer(), doc)
             Files.writeString(schematicPath, jsonStr)
             logger.info("Schematic saved to $schematicPath")
         } catch (e: Exception) {
-            logger.error("Failed to save schematic to ${projectPath.resolve(SCHEMATIC_FILE_NAME)}", e)
+            logger.error("Failed to save schematic to ${paths.schematic}", e)
             throw e
         }
     }

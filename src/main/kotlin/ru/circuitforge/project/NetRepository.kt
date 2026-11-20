@@ -19,8 +19,8 @@ object NetRepository {
     }
 
     /** Загружает netlist документ. Возвращает пустой при отсутствии. */
-    fun load(projectPath: Path): NetDocument {
-        val netsPath = projectPath.resolve(NETS_FILE_NAME)
+    fun load(paths: ProjectPaths): NetDocument {
+        val netsPath = paths.nets
         return try {
             val content = Files.readString(netsPath)
             json.decodeFromString(NetDocument.serializer(), content)
@@ -29,27 +29,26 @@ object NetRepository {
             NetDocument()
         }
     }
-
     /**
      * Сохраняет netlist документ с валидацией.
      * @throws IllegalArgumentException если валидация не пройдена
      */
     @Throws(IllegalArgumentException::class)
-    fun save(projectPath: Path, doc: NetDocument) {
-        val errors = validate(doc, projectPath)
+    fun save(paths: ProjectPaths, doc: NetDocument) {
+        val errors = validate(doc, paths)
         if (errors.isNotEmpty()) {
             val msg = "Validation errors:\n" + errors.joinToString("\n")
             throw IllegalArgumentException(msg)
         }
 
         try {
-            val netsPath = projectPath.resolve(NETS_FILE_NAME)
+            val netsPath = paths.nets
             Files.createDirectories(netsPath.parent)
             val jsonStr = json.encodeToString(NetDocument.serializer(), doc)
             Files.writeString(netsPath, jsonStr)
             logger.info("Netlist saved to $netsPath")
         } catch (e: Exception) {
-            logger.error("Failed to save netlist to ${projectPath.resolve(NETS_FILE_NAME)}", e)
+            logger.error("Failed to save netlist to ${paths.nets}", e)
             throw e
         }
     }
@@ -58,27 +57,23 @@ object NetRepository {
      * Валидирует netlist документ.
      * @return список сообщений об ошибках (пустой если всё ок)
      */
-    fun validate(doc: NetDocument, projectPath: Path): List<String> {
+    fun validate(doc: NetDocument, paths: ProjectPaths): List<String> {
         val errors = mutableListOf<String>()
 
-        // 1. Уникальность имён цепей
         val netNames = doc.nets.map { it.name }
         val duplicateNames = netNames.groupingBy { it }.eachCount().filter { it.value > 1 }
         duplicateNames.keys.forEach { name ->
             errors.add("Duplicate net name: '$name'")
         }
 
-        // 2. Загружаем BOM для проверки refDes
-        val bomDoc = BomRepository.load(projectPath)
+        val bomDoc = BomRepository.load(paths)
         val bomRefDes = bomDoc.items.map { it.refDes }.toSet()
 
-        // 3. Загружаем компоненты для проверки pinNumber
-        val componentsDir = projectPath.resolve("components")
+        val componentsDir = paths.componentsDir
         val componentCache = mutableMapOf<String, Component?>()
 
         doc.nets.forEach { net ->
             net.connections.forEach { conn ->
-                // Проверяем refDes
                 if (conn.refDes.isBlank()) {
                     errors.add("Net '${net.name}': empty refDes in connection")
                     return@forEach
@@ -88,7 +83,6 @@ object NetRepository {
                     return@forEach
                 }
 
-                // Проверяем pinNumber
                 if (conn.pinNumber.isBlank()) {
                     errors.add("Net '${net.name}': empty pinNumber for refDes '${conn.refDes}'")
                     return@forEach
@@ -96,10 +90,9 @@ object NetRepository {
 
                 val component = componentCache.getOrPut(conn.refDes) {
                     try {
-                        // Ищем компонент по slug из BOM
                         val bomItem = bomDoc.items.find { it.refDes == conn.refDes }
                         if (bomItem != null) {
-                            ComponentRepository.loadComponent(projectPath, bomItem.componentSlug)
+                            ComponentRepository.loadComponent(paths.projectDir, bomItem.componentSlug)
                         } else {
                             null
                         }
@@ -114,7 +107,6 @@ object NetRepository {
                         errors.add("Net '${net.name}': pinNumber '${conn.pinNumber}' not found in component '${conn.refDes}'")
                     }
                 }
-                // Если компонент не найден — пропускаем проверку pinNumber (о refDes уже сообщено)
             }
         }
 
@@ -126,8 +118,8 @@ object NetRepository {
      * Строки = цепи, колонки = все уникальные PortRef (refDes.pinNumber),
      * ячейки = "X" если связь существует.
      */
-    fun exportToCsv(projectPath: Path, outputPath: Path) {
-        val doc = load(projectPath)
+    fun exportToCsv(paths: ProjectPaths, outputPath: Path) {
+        val doc = load(paths)
         if (doc.nets.isEmpty()) {
             logger.warn("Nothing to export: no nets defined")
             return

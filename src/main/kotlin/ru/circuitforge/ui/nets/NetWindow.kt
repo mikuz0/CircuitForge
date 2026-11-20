@@ -455,8 +455,8 @@ class NetWindow : ProjectAware {
     private fun saveNets() {
         val task = object : javafx.concurrent.Task<Unit>() {
             override fun call() {
-                projectPath?.let { dir ->
-                    NetRepository.save(dir, NetDocument(schemaVersion = 1, nets = nets.toList()))
+                projectPaths?.let { paths ->
+                    NetRepository.save(paths, NetDocument(schemaVersion = 1, nets = nets.toList()))
                     savedSnapshot = serializeCurrentState()
                 }
             }
@@ -524,16 +524,23 @@ class NetWindow : ProjectAware {
     override fun showWindow() = stage.show()
 
     override fun openProject(projectPath: Path) {
-        this.projectPath = projectPath
-        projectLabel.text = "Project: ${projectPath.toString()}"
-        val doc = NetRepository.load(projectPath)
-        nets.setAll(doc.nets)
-        netNames.setAll(doc.nets.map { it.name })
-        savedSnapshot = serializeCurrentState()
-        selectedNetIndex = -1
-        connectionsList.clear()
-        refreshMatrix()
-        logger.info("Netlist opened for project: $projectPath, nets count: ${nets.size}")
+        try {
+            val project = ProjectRepository.load(projectPath.resolve("project.cfproj"))
+            val paths = ProjectPaths(projectPath, project.machineName)
+            this.projectPaths = paths
+            projectLabel.text = "Project: ${projectPath}"
+            val doc = NetRepository.load(paths)
+            nets.setAll(doc.nets)
+            netNames.setAll(doc.nets.map { it.name })
+            savedSnapshot = serializeCurrentState()
+            selectedNetIndex = -1
+            connectionsList.clear()
+            refreshMatrix()
+            logger.info("Netlist opened for project: $projectPath, nets count: ${nets.size}")
+        } catch (e: Exception) {
+            logger.error("Failed to open project at $projectPath", e)
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), "Не удалось открыть проект: ${e.message}")
+        }
     }
 
     override fun getStage(): Stage = stage

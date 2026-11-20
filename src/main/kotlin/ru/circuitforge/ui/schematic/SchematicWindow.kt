@@ -424,12 +424,9 @@ class SchematicWindow : ProjectAware {
     private fun saveSchematic() {
         val task = object : Task<Unit>() {
             override fun call() {
-                projectPath?.let { dir ->
-                    val doc = SchematicDocument(
-                        schemaVersion = 1,
-                        nodes = schematicNodes.toList()
-                    )
-                    SchematicRepository.save(dir, doc)
+                projectPaths?.let { paths ->
+                    val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList())
+                    SchematicRepository.save(paths, doc)
                 }
             }
 
@@ -492,12 +489,20 @@ class SchematicWindow : ProjectAware {
     override fun showWindow() = stage.show()
 
     override fun openProject(projectPath: Path) {
-        this.projectPath = projectPath
+        val paths = try {
+            val project = ProjectRepository.load(projectPath.resolve("project.cfproj"))
+            ProjectPaths(projectPath, project.machineName)
+        } catch (e: Exception) {
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), "Не удалось открыть проект: ${e.message}")
+            logger.error("Failed to open project at $projectPath", e)
+            return
+        }
+        this.projectPaths = paths
         stage.title = "CircuitForge — Schematic — $projectPath"
 
         val loadTask = object : Task<Unit>() {
             override fun call() {
-                val rows = BomRepository.loadRows(projectPath)
+                val rows = BomRepository.loadRows(paths)
                 bomRows.setAll(rows)
                 bomRowsMap.clear()
                 rows.forEach { row -> bomRowsMap[row.bomnetId] = row }

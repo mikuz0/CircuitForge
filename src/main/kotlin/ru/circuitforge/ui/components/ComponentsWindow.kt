@@ -31,7 +31,7 @@ class ComponentsWindow : ProjectAware {
     private val executor = Executors.newFixedThreadPool(2) { r ->
         Thread(r, "components-io").apply { isDaemon = true }
     }
-    private var projectPath: Path? = null
+    private var projectPaths: ProjectPaths? = null
 
     private val componentList = FXCollections.observableArrayList<ComponentSummary>()
     private val portList = FXCollections.observableArrayList<Port>()
@@ -475,8 +475,9 @@ class ComponentsWindow : ProjectAware {
         val task = object : javafx.concurrent.Task<Pair<String, Boolean>>() {
             override fun call(): Pair<String, Boolean> {
                 var isUsedInBom = false; var newSlug = originalSlug
-                projectPath?.let { dir ->
-                    val bomDoc = BomRepository.load(dir)
+                projectPaths?.let { paths ->
+                    val dir = paths.projectDir
+                    val bomDoc = BomRepository.load(paths)
                     isUsedInBom = bomDoc.items.any { it.componentSlug == originalSlug }
                     if (originalSlug != null) {
                         newSlug = ComponentRepository.saveComponent(dir, originalSlug, name, description, refPrefix, portList.toList(), mainPropertyList.toList(), extraPropertyList.toList())
@@ -488,7 +489,7 @@ class ComponentsWindow : ProjectAware {
             }
             override fun succeeded() {
                 val (slug, usedInBom) = value; editingComponentSlug = slug
-                projectPath?.let { dir -> componentList.setAll(ComponentRepository.listComponents(dir)) }
+                projectPaths?.let { paths -> componentList.setAll(ComponentRepository.listComponents(paths.projectDir)) }
                 clearComponentForm()
                 portList.clear(); originalPortList.clear(); mainPropertyList.clear(); originalMainPropertyList.clear()
                 extraPropertyList.clear(); originalExtraPropertyList.clear()
@@ -518,7 +519,7 @@ class ComponentsWindow : ProjectAware {
         task.setOnSucceeded {
             val newSlug = task.value
             if (newSlug.isNotBlank()) {
-                projectPath?.let { dir -> componentList.setAll(ComponentRepository.listComponents(dir)) }
+                projectPaths?.let { paths -> ComponentRepository.duplicateComponent(paths.projectDir, slug) } ?: ""
                 // Выделяем копию, чтобы пользователь сразу правил её
                 val copy = componentList.find { it.slug == newSlug }
                 if (copy != null) componentTable.selectionModel.select(copy)
@@ -535,7 +536,7 @@ class ComponentsWindow : ProjectAware {
         val selected = componentTable.selectionModel.selectedItem ?: return
         if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("components.alert.delete.confirm"), I18n.tr("components.alert.delete.confirm.text", selected.name))) return
         val task = object : javafx.concurrent.Task<Unit>() {
-            override fun call() { projectPath?.let { dir -> ComponentRepository.deleteComponent(dir, selected.slug) } }
+            override fun call() { projectPaths?.let { paths -> ComponentRepository.deleteComponent(paths.projectDir, selected.slug) } }
         }
         task.setOnSucceeded {
             componentList.remove(selected); portList.clear(); originalPortList.clear()
@@ -561,8 +562,8 @@ class ComponentsWindow : ProjectAware {
         editingComponentSlug = summary.slug
         componentNameField.text = summary.name; componentDescField.text = summary.description
         refPrefixField.text = summary.refPrefix; model3dField.clear()
-        projectPath?.let { dir ->
-            val compPath = dir.resolve("components").resolve("${summary.slug}$CFCOMP_EXT")
+        projectPaths?.let { paths ->
+            val compPath = paths.componentsDir.resolve("${summary.slug}$CFCOMP_EXT")
             logger.info("Loading component: ${summary.slug} from $compPath")
             if (Files.exists(compPath)) {
                 try {
@@ -625,9 +626,19 @@ class ComponentsWindow : ProjectAware {
     override fun showWindow() = stage.show()
 
     override fun openProject(projectPath: Path) {
-        this.projectPath = projectPath
-        val componentsDir = projectPath.resolve("components")
-        if (Files.exists(componentsDir)) { componentList.setAll(ComponentRepository.listComponents(projectPath)); logger.info("Components loaded: ${componentList.size}") }
+        try {
+            val project = ProjectRepository.load(projectPath.resolve("project.cfproj"))
+            val paths = ProjectPaths(projectPath, project.machineName)
+            this.projectPaths = paths
+            val componentsDir = paths.componentsDir
+            if (Files.exists(componentsDir)) {
+                componentList.setAll(ComponentRepository.listComponents(projectPath))
+                logger.info("Components loaded: ${componentList.size}")
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to open project at $projectPath", e)
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), "Не удалось открыть проект: ${e.message}")
+        }
     }
 
     override fun getStage(): Stage = stage
