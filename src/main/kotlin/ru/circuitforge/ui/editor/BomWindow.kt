@@ -27,7 +27,7 @@ class BomWindow : ProjectAware {
         Thread(r, "bom-io").apply { isDaemon = true }
     }
 
-    private var projectPath: Path? = null
+    private var projectPaths: ProjectPaths? = null
 
     private val bomRows = FXCollections.observableArrayList<BomRow>()
     private var savedSnapshot: String = ""
@@ -244,8 +244,8 @@ class BomWindow : ProjectAware {
     }
 
     private fun showAddItemDialog() {
-        val projectDir = projectPath ?: return
-        val components = ComponentRepository.listComponents(projectDir)
+        val paths = projectPaths ?: return
+        val components = ComponentRepository.listComponents(paths.projectDir)
         if (components.isEmpty()) {
             UiUtils.errorAlert("Нет компонентов", "В проекте нет компонентов. Создайте их в редакторе компонентов.")
             return

@@ -10,17 +10,17 @@ class ComponentRepositoryTest {
     @TempDir
     lateinit var tempDir: java.nio.file.Path
 
-    private fun setupProjectDir(): java.nio.file.Path {
-        val projectDir = tempDir.resolve("TestProject")
+    private fun setupProjectPaths(): ProjectPaths {
+        val projectDir = tempDir.resolve("testproject")
         Files.createDirectories(projectDir.resolve("components"))
-        return projectDir
+        return ProjectPaths(projectDir, "testproject")
     }
 
     @Test
     fun `testCreateComponent`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
         val slug = ComponentRepository.createComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             name = "Resistor 0603",
             description = "Generic 0603 resistor",
             refPrefix = "R",
@@ -31,15 +31,15 @@ class ComponentRepositoryTest {
         )
 
         assertEquals("resistor-0603", slug)
-        val compPath = projectDir.resolve("components").resolve("resistor-0603.cfcomp")
+        val compPath = paths.projectDir.resolve("components").resolve("resistor-0603.cfcomp")
         assertTrue(Files.exists(compPath), "Файл компонента должен быть создан")
     }
 
     @Test
     fun `testLoadComponent`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
         val slug = ComponentRepository.createComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             name = "ATmega328P",
             description = "8-bit AVR MCU",
             refPrefix = "U",
@@ -51,7 +51,7 @@ class ComponentRepositoryTest {
             )
         )
 
-        val loaded = ComponentRepository.loadComponent(projectDir, slug)
+        val loaded = ComponentRepository.loadComponent(paths.projectDir, slug)
 
         assertEquals("ATmega328P", loaded.name)
         assertEquals("U", loaded.refPrefix)
@@ -63,11 +63,11 @@ class ComponentRepositoryTest {
 
     @Test
     fun `testUniqueNameValidation`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
 
         // Создаём первый компонент с именем "test-comp"
         val slug1 = ComponentRepository.createComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             name = "test-comp",
             description = "First component",
             refPrefix = "U"
@@ -76,7 +76,7 @@ class ComponentRepositoryTest {
 
         // Создаём второй компонент с другим именем
         ComponentRepository.createComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             name = "other-comp",
             description = "Second component",
             refPrefix = "R"
@@ -84,7 +84,7 @@ class ComponentRepositoryTest {
 
         // Пытаемся создать компонент с тем же name — должен получить уникальный slug
         val slug2 = ComponentRepository.createComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             name = "test-comp",
             description = "Third component with same name",
             refPrefix = "C"
@@ -95,11 +95,11 @@ class ComponentRepositoryTest {
 
         // Проверяем, что saveComponent для существующего компонента с тем же именем
         // НЕ выбрасывает исключение, а сохраняет под уникальным именем (или перезаписывает)
-        val comp = ComponentRepository.loadComponent(projectDir, slug2)
+        val comp = ComponentRepository.loadComponent(paths.projectDir, slug2)
 
         // Мы ожидаем, что сохранение пройдёт без ошибок (новая логика)
         val newSlug = ComponentRepository.saveComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             originalSlug = slug2,
             name = "test-comp", // имя совпадает с первым компонентом
             description = comp.description,
@@ -111,29 +111,29 @@ class ComponentRepositoryTest {
         // либо сохранить под старым, но без исключения.
         assertNotNull(newSlug)
         // Проверим, что файл с этим именем существует
-        val newPath = projectDir.resolve("components").resolve("${newSlug}.cfcomp")
+        val newPath = paths.projectDir.resolve("components").resolve("${newSlug}.cfcomp")
         assertTrue(Files.exists(newPath), "Файл должен существовать после сохранения")
     }
 
     @Test
     fun `testRenameComponent`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
 
         // Создаём компонент
         val originalSlug = ComponentRepository.createComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             name = "ATmega328P",
             description = "Original description",
             refPrefix = "U",
             ports = listOf(Port(1, "1", "VCC", "Power"))
         )
 
-        val oldPath = projectDir.resolve("components").resolve("${originalSlug}.cfcomp")
+        val oldPath = paths.projectDir.resolve("components").resolve("${originalSlug}.cfcomp")
         assertTrue(Files.exists(oldPath))
 
         // Переименовываем
         val newSlug = ComponentRepository.saveComponent(
-            projectDir = projectDir,
+            projectDir = paths.projectDir,
             originalSlug = originalSlug,
             name = "ATmega328P-variant",
             description = "Updated description",
@@ -147,7 +147,7 @@ class ComponentRepositoryTest {
         assertEquals("atmega328p-variant", newSlug)
 
         // Старый файл удалён
-        val newPath = projectDir.resolve("components").resolve("${newSlug}.cfcomp")
+        val newPath = paths.projectDir.resolve("components").resolve("${newSlug}.cfcomp")
         assertFalse(Files.exists(oldPath), "Старый файл должен быть удалён")
         assertTrue(Files.exists(newPath), "Новый файл должен быть создан")
 
@@ -160,14 +160,14 @@ class ComponentRepositoryTest {
 
     @Test
     fun `testListComponents`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
 
         // Создаём 3 компонента
-        ComponentRepository.createComponent(projectDir, "Capacitor 10uF", "Electrolytic", "C")
-        ComponentRepository.createComponent(projectDir, "ATmega328P", "MCU", "U")
-        ComponentRepository.createComponent(projectDir, "Resistor 0603", "Generic", "R")
+        ComponentRepository.createComponent(paths.projectDir, "Capacitor 10uF", "Electrolytic", "C")
+        ComponentRepository.createComponent(paths.projectDir, "ATmega328P", "MCU", "U")
+        ComponentRepository.createComponent(paths.projectDir, "Resistor 0603", "Generic", "R")
 
-        val components = ComponentRepository.listComponents(projectDir)
+        val components = ComponentRepository.listComponents(paths.projectDir)
 
         assertEquals(3, components.size)
 

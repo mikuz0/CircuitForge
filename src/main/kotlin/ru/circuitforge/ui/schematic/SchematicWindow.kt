@@ -36,7 +36,7 @@ class SchematicWindow : ProjectAware {
     private val executor = Executors.newFixedThreadPool(2) { r ->
         Thread(r, "schematic-io").apply { isDaemon = true }
     }
-    private var projectPath: Path? = null
+    private var projectPaths: ProjectPaths? = null
 
     // Данные
     private val bomRows = FXCollections.observableArrayList<BomRow>()
@@ -455,19 +455,17 @@ class SchematicWindow : ProjectAware {
     private fun saveSchematicAsync() {
         val task = object : Task<Unit>() {
             override fun call() {
-                projectPath?.let { dir ->
+                projectPaths?.let { paths ->
                     val doc = SchematicDocument(
                         schemaVersion = 1,
                         nodes = schematicNodes.toList()
                     )
-                    SchematicRepository.save(dir, doc)
+                    SchematicRepository.save(paths, doc)
                 }
             }
-
             override fun succeeded() {
                 logger.info("Schematic auto-saved after drag")
             }
-
             override fun failed() {
                 logger.error("Failed to auto-save schematic", exception)
             }
@@ -476,8 +474,8 @@ class SchematicWindow : ProjectAware {
     }
 
     private fun revertChanges() {
-        projectPath?.let { dir ->
-            val doc = SchematicRepository.load(dir)
+        projectPaths?.let { paths ->
+            val doc = SchematicRepository.load(paths)
             schematicNodes.setAll(doc.nodes)
             drawSchematic()
             statusLabel.text = I18n.tr("net.status.reverted") ?: "Отменено"
@@ -510,21 +508,21 @@ class SchematicWindow : ProjectAware {
                 componentsMap.clear()
                 rows.forEach { row ->
                     try {
-                        val comp = ComponentRepository.loadComponentById(projectPath, row.componentId)
+                        val comp = ComponentRepository.loadComponentById(paths.projectDir, row.componentId)
                         if (comp != null) componentsMap[row.componentId] = comp
                     } catch (e: Exception) {
                         logger.warn("Failed to load component for row ${row.refDes}", e)
                     }
                 }
 
-                val netDoc = NetRepository.load(projectPath)
+                val netDoc = NetRepository.load(paths)
                 nets.setAll(netDoc.nets)
 
-                val existingDoc = SchematicRepository.load(projectPath)
+                val existingDoc = SchematicRepository.load(paths)
                 if (existingDoc.nodes.isEmpty()) {
                     logger.info("No schematic data found, generating grid layout")
                     val nodes = generateGridCoordinates(rows)
-                    SchematicRepository.save(projectPath, SchematicDocument(schemaVersion = 1, nodes = nodes))
+                    SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
                     schematicNodes.setAll(nodes)
                 } else {
                     schematicNodes.setAll(existingDoc.nodes)

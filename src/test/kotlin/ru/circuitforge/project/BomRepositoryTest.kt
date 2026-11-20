@@ -11,17 +11,17 @@ class BomRepositoryTest {
     @TempDir
     lateinit var tempDir: java.nio.file.Path
 
-    private fun setupProjectDir(): java.nio.file.Path {
-        val projectDir = tempDir.resolve("TestProject")
+    private fun setupProjectPaths(): ProjectPaths {
+        val projectDir = tempDir.resolve("testproject")
         Files.createDirectories(projectDir.resolve("components"))
-        return projectDir
+        return ProjectPaths(projectDir, "testproject")
     }
 
     @Test
     fun `testLoadEmpty`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
 
-        val bom = BomRepository.load(projectDir)
+        val bom = BomRepository.load(paths)
 
         assertEquals(1, bom.schemaVersion)
         assertTrue(bom.items.isEmpty())
@@ -29,19 +29,19 @@ class BomRepositoryTest {
 
     @Test
     fun `testSaveAndLoad`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
 
         val bomDoc = BomDocument(
             schemaVersion = 1,
             items = listOf(
-                BomItem(number = 1, refDes = "R1", componentSlug = "resistor-0603", comment = "10k"),
-                BomItem(number = 2, refDes = "C1", componentSlug = "capacitor-10uf", comment = "10uF electrolytic")
+                BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k"),
+                BomItem(number = 2, refDes = "C1", componentId = "uuid-2", componentSlug = "capacitor-10uf", comment = "10uF electrolytic")
             )
         )
 
-        BomRepository.save(projectDir, bomDoc)
+        BomRepository.save(paths, bomDoc)
 
-        val loaded = BomRepository.load(projectDir)
+        val loaded = BomRepository.load(paths)
 
         assertEquals(2, loaded.items.size)
         assertEquals(1, loaded.items[0].number)
@@ -55,13 +55,12 @@ class BomRepositoryTest {
 
     @Test
     fun `testInitFromComponents`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
 
-        // Создаём 2 компонента (БЕЗ поля slug)
-        val comp1Path = projectDir.resolve("components").resolve("resistor-0603.cfcomp")
+        // Создаём 2 компонента
+        val comp1Path = paths.projectDir.resolve("components").resolve("resistor-0603.cfcomp")
         val comp1 = Component(
             schemaVersion = 1,
-            // slug = "resistor-0603", // <--- УДАЛЕНО
             name = "Resistor 0603",
             description = "Generic 0603 resistor",
             refPrefix = "R",
@@ -69,10 +68,9 @@ class BomRepositoryTest {
         )
         ComponentRepository.save(comp1Path, comp1)
 
-        val comp2Path = projectDir.resolve("components").resolve("capacitor-10uf.cfcomp")
+        val comp2Path = paths.projectDir.resolve("components").resolve("capacitor-10uf.cfcomp")
         val comp2 = Component(
             schemaVersion = 1,
-            // slug = "capacitor-10uf", // <--- УДАЛЕНО
             name = "Capacitor 10uF",
             description = "Electrolytic capacitor",
             refPrefix = "C",
@@ -80,7 +78,7 @@ class BomRepositoryTest {
         )
         ComponentRepository.save(comp2Path, comp2)
 
-        val bomDoc = BomRepository.initFromComponents(projectDir)
+        val bomDoc = BomRepository.initFromComponents(paths)
 
         assertEquals(2, bomDoc.items.size)
         // Проверяем, что есть элементы с правильными componentSlug (именами файлов)
@@ -94,18 +92,19 @@ class BomRepositoryTest {
 
     @Test
     fun `testSerializationFormat`() {
-        val projectDir = setupProjectDir()
+        val paths = setupProjectPaths()
 
         val bomDoc = BomDocument(
             schemaVersion = 1,
             items = listOf(
-                BomItem(number = 1, refDes = "R1", componentSlug = "resistor-0603", comment = "10k")
+                BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k")
             )
         )
 
-        BomRepository.save(projectDir, bomDoc)
+        BomRepository.save(paths, bomDoc)
 
-        val bomPath = projectDir.resolve("bom.json")
+        // Файл должен быть named <machineName>.bom.json
+        val bomPath = paths.bom
         val jsonContent = Files.readString(bomPath)
         val json = Json { ignoreUnknownKeys = true }
 
@@ -125,5 +124,15 @@ class BomRepositoryTest {
         assertTrue(jsonContent.contains("\"refDes\""), "Ключ refDes должен быть в JSON")
         assertTrue(jsonContent.contains("\"componentSlug\""), "Ключ componentSlug должен быть в JSON")
         assertTrue(jsonContent.contains("\"comment\""), "Ключ comment должен быть в JSON")
+    }
+
+    @Test
+    fun `testFilePathUsesMachineNamePrefix`() {
+        val paths = setupProjectPaths()
+
+        // Проверяем, что файл BOM называется правильно
+        assertEquals("testproject.bom.json", paths.bom.fileName.toString())
+        assertEquals("testproject.nets.json", paths.nets.fileName.toString())
+        assertEquals("testproject.schematic.json", paths.schematic.fileName.toString())
     }
 }

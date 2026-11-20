@@ -12,21 +12,22 @@ class ProjectRepositoryTest {
 
     @Test
     fun `testCreateProject`() {
-        val projectDir = ProjectRepository.create("TestProject", tempDir)
+        val projectFile = ProjectRepository.create("TestProject", tempDir)
 
-        // Проверка структуры папок
-        assertTrue(Files.exists(tempDir.resolve("TestProject")), "Папка проекта должна быть создана")
-        assertTrue(Files.isDirectory(tempDir.resolve("TestProject/components")), "Папка components должна быть создана")
-        assertTrue(Files.isDirectory(tempDir.resolve("TestProject/nets")), "Папка nets должна быть создана")
-        assertTrue(Files.isDirectory(tempDir.resolve("TestProject/exports")), "Папка exports должна быть создана")
+        // machineName для "TestProject" = "testproject"
+        val projectDir = tempDir.resolve("testproject")
+        assertTrue(Files.exists(projectDir), "Папка проекта должна быть создана")
+        assertTrue(Files.isDirectory(projectDir.resolve("components")), "Папка components должна быть создана")
+        assertTrue(Files.isDirectory(projectDir.resolve("nets")), "Папка nets должна быть создана")
+        assertTrue(Files.isDirectory(projectDir.resolve("exports")), "Папка exports должна быть создана")
 
         // Проверка файла проекта
-        val projectFile = tempDir.resolve("TestProject/project.cfproj")
         assertTrue(Files.exists(projectFile), "Файл project.cfproj должен быть создан")
 
         // Проверка содержимого
         val project = ProjectRepository.load(projectFile)
         assertEquals("TestProject", project.name)
+        assertEquals("testproject", project.machineName)
         assertEquals(1, project.version)
         assertNotNull(project.created)
     }
@@ -66,9 +67,13 @@ class ProjectRepositoryTest {
         assertEquals("AlphaProject", projects[0].name)
         assertEquals("BetaProject", projects[1].name)
 
-        // Проверка путей
-        assertTrue(projects[0].path.toString().contains("AlphaProject"))
-        assertTrue(projects[1].path.toString().contains("BetaProject"))
+        // Проверка путей (machineName = slug)
+        assertTrue(projects[0].path.toString().contains("alphaproject"))
+        assertTrue(projects[1].path.toString().contains("betaproject"))
+
+        // Проверка machineName
+        assertEquals("alphaproject", projects[0].machineName)
+        assertEquals("betaproject", projects[1].machineName)
 
         // Проверка, что project.cfproj существует
         assertTrue(
@@ -98,7 +103,27 @@ class ProjectRepositoryTest {
         val loaded = ProjectRepository.load(projectFile)
 
         assertEquals("TestProject", loaded.name)
+        assertEquals("testproject", loaded.machineName)
         assertEquals(1, loaded.version)
         assertNotNull(loaded.created)
+    }
+
+    @Test
+    fun `testGenerateMachineName`() {
+        assertEquals("testproject", ProjectRepository.generateMachineName("TestProject"))
+        assertEquals("my-project", ProjectRepository.generateMachineName("My Project"))
+        // Кириллица удаляется алгоритмом slug, остаются только латиница/цифры
+        assertEquals("stm32", ProjectRepository.generateMachineName("STM32 плата"))
+        assertEquals("a", ProjectRepository.generateMachineName("A"))
+    }
+
+    @Test
+    fun `testGenerateMachineNameThrowsOnSpecialCharsOnly`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ProjectRepository.generateMachineName("!!!")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ProjectRepository.generateMachineName("   ")
+        }
     }
 }

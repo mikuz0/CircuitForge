@@ -29,7 +29,7 @@ class NetWindow : ProjectAware {
         Thread(r, "nets-io").apply { isDaemon = true }
     }
 
-    private var projectPath: Path? = null
+    private var projectPaths: ProjectPaths? = null
 
     // Данные
     private val nets = FXCollections.observableArrayList<Net>()
@@ -237,7 +237,7 @@ class NetWindow : ProjectAware {
             return
         }
 
-        val bomItems = projectPath?.let { BomRepository.load(it).items } ?: emptyList()
+        val bomItems = projectPaths?.let { BomRepository.load(it).items } ?: emptyList()
         if (bomItems.isEmpty()) {
             UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.alert.no.bom"))
             return
@@ -258,9 +258,9 @@ class NetWindow : ProjectAware {
 
         refDesComboBox.valueProperty().addListener { _, _, newRefDes ->
             pinComboBox.items.clear()
-            if (newRefDes != null && projectPath != null) {
+            if (newRefDes != null && projectPaths != null) {
                 try {
-                    val comp = ComponentRepository.loadComponent(projectPath!!, newRefDes.componentSlug)
+                    val comp = ComponentRepository.loadComponent(projectPaths!!.projectDir, newRefDes.componentSlug)
                     pinComboBox.items.setAll(comp.ports.map { it.pinNumber })
                 } catch (e: Exception) {
                     logger.warn("Failed to load component", e)
@@ -430,14 +430,14 @@ class NetWindow : ProjectAware {
         chooser.title = I18n.tr("net.dialog.export.csv")
         chooser.initialFileName = "nets.csv"
         chooser.extensionFilters.add(FileChooser.ExtensionFilter("CSV Files", "*.csv"))
-        val projectDir = projectPath ?: return
-        val exportsDir = projectDir.resolve("exports")
+        val paths = projectPaths ?: return
+        val exportsDir = paths.exportsDir
         if (Files.exists(exportsDir)) chooser.initialDirectory = exportsDir.toFile()
 
         val file = chooser.showSaveDialog(stage)
         if (file != null) {
             val task = object : javafx.concurrent.Task<Unit>() {
-                override fun call() { NetRepository.exportToCsv(projectPath!!, file.toPath()) }
+                override fun call() { NetRepository.exportToCsv(paths, file.toPath()) }
             }
             task.setOnSucceeded {
                 statusLabel.text = I18n.tr("net.status.exported", file.path)
@@ -478,8 +478,8 @@ class NetWindow : ProjectAware {
     }
 
     private fun revertChanges() {
-        projectPath?.let { dir ->
-            val doc = NetRepository.load(dir)
+        projectPaths?.let { paths ->
+            val doc = NetRepository.load(paths)
             nets.setAll(doc.nets)
             netNames.setAll(doc.nets.map { it.name })
             savedSnapshot = serializeCurrentState()

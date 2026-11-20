@@ -441,7 +441,7 @@ class ComponentsWindow : ProjectAware {
 
     private fun setupEventHandlers() {
         componentSaveButton.setOnAction { saveComponent() }
-        componentDuplicateButton.setOnAction { duplicateComponent() }   // ← сюда
+        componentDuplicateButton.setOnAction { duplicateComponent() }
         componentDeleteButton.setOnAction { deleteComponent() }
         componentRevertButton.setOnAction { revertComponent() }
         portAddButton.setOnAction { addPortRow() }
@@ -508,19 +508,19 @@ class ComponentsWindow : ProjectAware {
         }
         executor.submit(task)
     }
+
     private fun duplicateComponent() {
         val slug = editingComponentSlug ?: return
         val task = object : javafx.concurrent.Task<String>() {
             override fun call(): String {
-                val dir = projectPath ?: return ""
-                return ComponentRepository.duplicateComponent(dir, slug)
+                val paths = projectPaths ?: return ""
+                return ComponentRepository.duplicateComponent(paths.projectDir, slug)
             }
         }
         task.setOnSucceeded {
             val newSlug = task.value
             if (newSlug.isNotBlank()) {
-                projectPaths?.let { paths -> ComponentRepository.duplicateComponent(paths.projectDir, slug) } ?: ""
-                // Выделяем копию, чтобы пользователь сразу правил её
+                projectPaths?.let { paths -> componentList.setAll(ComponentRepository.listComponents(paths.projectDir)) }
                 val copy = componentList.find { it.slug == newSlug }
                 if (copy != null) componentTable.selectionModel.select(copy)
                 logger.info("Component duplicated: $slug -> $newSlug")
@@ -532,6 +532,7 @@ class ComponentsWindow : ProjectAware {
         }
         executor.submit(task)
     }
+
     private fun deleteComponent() {
         val selected = componentTable.selectionModel.selectedItem ?: return
         if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("components.alert.delete.confirm"), I18n.tr("components.alert.delete.confirm.text", selected.name))) return
