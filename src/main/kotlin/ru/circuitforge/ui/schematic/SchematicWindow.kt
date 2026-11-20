@@ -8,6 +8,8 @@ import javafx.scene.Group
 import javafx.scene.Scene
 import javafx.scene.canvas.Canvas
 import javafx.scene.canvas.GraphicsContext
+import javafx.scene.control.Alert
+import javafx.scene.control.Alert.AlertType
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.ScrollPane
@@ -57,6 +59,7 @@ class SchematicWindow : ProjectAware {
     private val scrollPane = ScrollPane()
     private val saveButton = Button(I18n.tr("bom.btn.save") ?: "Сохранить")
     private val revertButton = Button(I18n.tr("bom.btn.revert") ?: "Отменить")
+    private val syncButton = Button(I18n.tr("schematic.btn.sync") ?: "Синхронизировать")
     private val statusLabel = Label("")
 
     // Drag & Drop компонентов
@@ -114,7 +117,7 @@ class SchematicWindow : ProjectAware {
         scrollPane.isFitToHeight = false
 
         // Панель инструментов
-        val bottomBar = HBox(10.0, saveButton, revertButton, statusLabel).apply {
+        val bottomBar = HBox(10.0, saveButton, revertButton, syncButton, statusLabel).apply {
             alignment = Pos.CENTER_LEFT
             padding = Insets(8.0)
             style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
@@ -131,6 +134,7 @@ class SchematicWindow : ProjectAware {
     private fun setupToolbar() {
         saveButton.setOnAction { saveSchematic() }
         revertButton.setOnAction { revertChanges() }
+        syncButton.setOnAction { openSyncDialog() }
     }
 
     private fun drawSchematic() {
@@ -482,6 +486,241 @@ class SchematicWindow : ProjectAware {
             statusLabel.style = "-fx-text-fill: blue;"
             logger.info("Schematic reverted")
         }
+    }
+
+    /** Открыть диалог синхронизации */
+    private fun openSyncDialog() {
+        val paths = projectPaths ?: return
+
+        // Загружаем актуальные данные
+        val newBomRows = try {
+            BomRepository.loadRows(paths)
+        } catch (e: Exception) {
+            logger.error("Failed to load BOM for sync", e)
+            UiUtils.errorAlert(
+                I18n.tr("common.alert.error") ?: "Ошибка",
+                I18n.tr("schematic.sync.error.load.bom") ?: "Не удалось загрузить BOM: ${e.message}"
+            )
+            return
+        }
+
+        if (newBomRows.isEmpty()) {
+            UiUtils.errorAlert(
+                I18n.tr("common.alert.error") ?: "Ошибка",
+                I18n.tr("schematic.sync.error.empty.bom") ?: "BOM пуст. Сначала создайте BOM."
+            )
+            return
+        }
+
+        // Сравниваем
+        val currentBomnetIds = schematicNodes.map { it.bomnetId }.toSet()
+        val newBomnetIds = newBomRows.map { it.bomnetId }.toSet()
+
+        val newRows = newBomRows.filter { it.bomnetId !in currentBomnetIds }
+        val missingNodes = schematicNodes.filter { it.bomnetId !in newBomnetIds }
+
+        val report = SyncReport(newRows, missingNodes)
+
+        // Если нет изменений — показываем сообщение
+        if (report.newRows.isEmpty() && report.missingNodes.isEmpty()) {
+            val alert = Alert(Alert.AlertType.INFORMATION)
+            alert.title = I18n.tr("schematic.sync.title") ?: "Синхронизация схемы"
+            alert.headerText = I18n.tr("schematic.sync.no.changes") ?: "Схема актуальна"
+            alert.contentText = I18n.tr("schematic.sync.no.changes.message") ?: "Нет изменений для синхронизации."
+            alert.showAndWait()
+            return
+        }
+
+        // Открываем диалог
+        val dialog = SyncDialog(stage, report)
+        val result = dialog.showAndWait() ?: return
+
+        // Применяем изменения
+        syncWithProject(result, paths, newBomRows, report)
+    }
+
+    /** Применить синхронизацию */
+    private fun syncWithProject(result: SyncDialog.SyncResult, paths: ProjectPaths, newBomRows: List<BomRow>, report: SyncReport) {
+        val task = object : Task<Unit>() {
+            override fun call() {
+                val currentNodes = schematicNodes.toList()
+                val currentBomnetIds = currentNodes.map { it.bomnetId }.toSet()
+
+                // Загружаем актуальные компоненты для размещения
+                val componentsMap = mutableMapOf<String, Component>()
+                newBomRows.forEach { row ->
+                    try {
+                        val comp = ComponentRepository.loadComponentById(paths.projectDir, row.componentId)
+                        if (comp != null) componentsMap[row.componentId] = comp
+                    } catch (e: Exception) {
+                        logger.warn("Failed to load component for row ${row.refDes}", e)
+                    }
+                }
+
+                // Загружаем nets для force-directed placement
+                val netDoc = NetRepository.load(paths)
+
+                // Добавляем новые компоненты
+                if (result.addNew && report.newRows.isNotEmpty()) {
+                    val newNodes = placeNewComponents(report.newRows, currentNodes, netDoc.nets, result.placementNear, componentsMap)
+                    schematicNodes.addAll(newNodes)
+                    logger.info("Added ${newNodes.size} new components to schematic")
+                }
+
+                // Удаляем отсутствующие компоненты
+                if (result.removeMissing && report.missingNodes.isNotEmpty()) {
+                    val missingIds = report.missingNodes.map { it.bomnetId }.toSet()
+                    schematicNodes.removeAll { it.bomnetId in missingIds }
+                    logger.info("Removed ${missingIds.size} components from schematic")
+                }
+
+                // Сохраняем
+                val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList())
+                SchematicRepository.save(paths, doc)
+            }
+
+            override fun succeeded() {
+                javafx.application.Platform.runLater {
+                    drawSchematic()
+                    val added = if (result.addNew) report.newRows.size else 0
+                    val removed = if (result.removeMissing) report.missingNodes.size else 0
+                    statusLabel.text = if (added > 0 && removed > 0) {
+                        I18n.tr("schematic.sync.status.both", added, removed)
+                            .replace("{0}", added.toString()).replace("{1}", removed.toString())
+                    } else if (added > 0) {
+                        I18n.tr("schematic.sync.status.added", added)
+                            .replace("{0}", added.toString())
+                    } else {
+                        I18n.tr("schematic.sync.status.removed", removed)
+                            .replace("{0}", removed.toString())
+                    }
+                    statusLabel.style = "-fx-text-fill: green;"
+                    logger.info("Schematic synchronized: +$added - $removed")
+                }
+            }
+
+            override fun failed() {
+                javafx.application.Platform.runLater {
+                    val ex = exception
+                    UiUtils.errorAlert(
+                        I18n.tr("common.alert.error") ?: "Ошибка",
+                        ex?.message ?: "Unknown error"
+                    )
+                    logger.error("Failed to sync schematic", ex)
+                }
+            }
+        }
+        executor.submit(task)
+    }
+
+    /** Разместить новые компоненты на схеме */
+    private fun placeNewComponents(
+        newRows: List<BomRow>,
+        existingNodes: List<SchematicNode>,
+        nets: List<Net>,
+        placementNear: Boolean,
+        componentsMap: Map<String, Component>
+    ): List<SchematicNode> {
+        if (newRows.isEmpty()) return emptyList()
+
+        val newNodes = mutableListOf<SchematicNode>()
+        val existingBomnetIds = existingNodes.map { it.bomnetId }.toSet()
+
+        if (placementNear && existingNodes.isNotEmpty()) {
+            // Force-directed placement: ищем связанных компонентов и размещаем рядом
+            newRows.forEach { newRow ->
+                // Найти цепи, в которые входит новый компонент
+                val connectedNets = nets.filter { net ->
+                    net.connections.any { conn -> conn.refDes == newRow.refDes }
+                }
+
+                // Собрать bomnetId связанных компонентов
+                val connectedBomnetIds = mutableSetOf<String>()
+                connectedNets.forEach { net ->
+                    net.connections.forEach { conn ->
+                        if (conn.refDes != newRow.refDes && conn.refDes.isNotBlank()) {
+                            // Найти bomnetId по refDes
+                            val connectedRow = newRows.find { it.refDes == conn.refDes }
+                                ?: BomRepository.loadRows(ProjectPaths(newRows[0].let { r -> java.nio.file.Path.of(r.comment) }, "")).find { it.refDes == conn.refDes } // fallback
+                            // Проще: ищем в existingNodes по refDes через bomRowsMap
+                            // Но у нас нет доступа к BomRow -> bomnetId маппингу
+                            // Поэтому используем refDes напрямую
+                            val existingNode = existingNodes.find { node ->
+                                // Ищем node по refDes из BomRow
+                                bomRowsMap.entries.find { it.value.refDes == conn.refDes }?.value?.bomnetId == node.bomnetId
+                            }
+                            if (existingNode != null) {
+                                connectedBomnetIds.add(existingNode.bomnetId)
+                            }
+                        }
+                    }
+                }
+
+                // Разместить новый компонент
+                if (connectedBomnetIds.isNotEmpty()) {
+                    // Найти центр связанных компонентов
+                    val connectedNodes = existingNodes.filter { it.bomnetId in connectedBomnetIds }
+                    if (connectedNodes.isNotEmpty()) {
+                        val centerX = connectedNodes.map { it.x }.average()
+                        val centerY = connectedNodes.map { it.y }.average()
+
+                        // Найти свободное место вокруг центра
+                        val idealLength = 150.0
+                        var placed = false
+                        for (angle in 0 until 360 step 45) {
+                            val rad = Math.toRadians(angle.toDouble())
+                            val newX = centerX + Math.cos(rad) * idealLength
+                            val newY = centerY + Math.sin(rad) * idealLength
+
+                            // Проверить, не занято ли место
+                            val isOccupied = newNodes.any { it.x == newX && it.y == newY }
+                                || existingNodes.any { kotlin.math.abs(it.x - newX) < 50 && kotlin.math.abs(it.y - newY) < 50 }
+
+                            if (!isOccupied) {
+                                newNodes.add(SchematicNode(newRow.bomnetId, newX, newY, 0.0))
+                                placed = true
+                                break
+                            }
+                        }
+                        if (!placed) {
+                            newNodes.add(SchematicNode(newRow.bomnetId, centerX + idealLength, centerY, 0.0))
+                        }
+                    } else {
+                        newNodes.add(SchematicNode(newRow.bomnetId, 0.0, 0.0, 0.0))
+                    }
+                } else {
+                    // Нет связанных компонентов — разместить в свободном месте
+                    newNodes.add(SchematicNode(newRow.bomnetId, 0.0, 0.0, 0.0))
+                }
+            }
+        } else {
+            // Разместить в свободном месте справа
+            val maxX = if (existingNodes.isNotEmpty()) {
+                existingNodes.maxOfOrNull { it.x } ?: 0.0
+            } else {
+                0.0
+            }
+
+            val columns = 4
+            val stepX = 250.0
+            val stepY = 200.0
+            val startX = maxX + 100.0
+
+            newRows.forEachIndexed { index, row ->
+                val col = index % columns
+                val rowIdx = index / columns
+                newNodes.add(
+                    SchematicNode(
+                        bomnetId = row.bomnetId,
+                        x = startX + col * stepX,
+                        y = 100.0 + rowIdx * stepY,
+                        rotation = 0.0
+                    )
+                )
+            }
+        }
+
+        return newNodes
     }
 
     override fun showWindow() = stage.show()
