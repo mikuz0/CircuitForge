@@ -56,6 +56,7 @@ class ComponentsWindow : ProjectAware {
     private val componentSaveButton = Button(I18n.tr("components.btn.save"))
     private val componentDeleteButton = Button(I18n.tr("components.btn.delete"))
     private val componentRevertButton = Button(I18n.tr("components.btn.revert"))
+    private val componentDuplicateButton = Button(I18n.tr("components.btn.duplicate"))
 
     // Поля формы порта
     private val portPinNumberField = TextField()
@@ -186,7 +187,7 @@ class ComponentsWindow : ProjectAware {
         GridPane.setConstraints(refPrefixLabel, 0, 2); GridPane.setConstraints(refPrefixField, 1, 2)
         GridPane.setConstraints(model3dLabel, 0, 3); GridPane.setConstraints(model3dField, 1, 3)
         grid.children.setAll(nameLabel, componentNameField, descLabel, componentDescField, refPrefixLabel, refPrefixField, model3dLabel, model3dField)
-        val buttonBar = HBox(10.0, componentSaveButton, componentDeleteButton, componentRevertButton).apply { alignment = Pos.CENTER_LEFT }
+        val buttonBar = HBox(10.0, componentSaveButton, componentDuplicateButton, componentDeleteButton, componentRevertButton).apply { alignment = Pos.CENTER_LEFT }
         return VBox(10.0, Label(I18n.tr("components.label.properties")), grid, buttonBar).apply {
             padding = Insets(10.0); minWidth = 300.0
         }
@@ -440,6 +441,7 @@ class ComponentsWindow : ProjectAware {
 
     private fun setupEventHandlers() {
         componentSaveButton.setOnAction { saveComponent() }
+        componentDuplicateButton.setOnAction { duplicateComponent() }   // ← сюда
         componentDeleteButton.setOnAction { deleteComponent() }
         componentRevertButton.setOnAction { revertComponent() }
         portAddButton.setOnAction { addPortRow() }
@@ -505,7 +507,30 @@ class ComponentsWindow : ProjectAware {
         }
         executor.submit(task)
     }
-
+    private fun duplicateComponent() {
+        val slug = editingComponentSlug ?: return
+        val task = object : javafx.concurrent.Task<String>() {
+            override fun call(): String {
+                val dir = projectPath ?: return ""
+                return ComponentRepository.duplicateComponent(dir, slug)
+            }
+        }
+        task.setOnSucceeded {
+            val newSlug = task.value
+            if (newSlug.isNotBlank()) {
+                projectPath?.let { dir -> componentList.setAll(ComponentRepository.listComponents(dir)) }
+                // Выделяем копию, чтобы пользователь сразу правил её
+                val copy = componentList.find { it.slug == newSlug }
+                if (copy != null) componentTable.selectionModel.select(copy)
+                logger.info("Component duplicated: $slug -> $newSlug")
+            }
+        }
+        task.setOnFailed {
+            UiUtils.errorAlert(I18n.tr("components.alert.duplicate.failed"), task.exception?.message ?: I18n.tr("common.alert.unknown.error"))
+            logger.error("Failed to duplicate component", task.exception)
+        }
+        executor.submit(task)
+    }
     private fun deleteComponent() {
         val selected = componentTable.selectionModel.selectedItem ?: return
         if (!UiUtils.confirmAlert(I18n.tr("common.alert.confirm"), I18n.tr("components.alert.delete.confirm"), I18n.tr("components.alert.delete.confirm.text", selected.name))) return

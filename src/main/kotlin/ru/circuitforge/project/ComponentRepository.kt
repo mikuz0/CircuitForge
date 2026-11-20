@@ -62,7 +62,27 @@ object ComponentRepository {
         logger.info("Component created: ${slug}$CFCOMP_EXT")
         return slug
     }
+    /**
+     * Создаёт копию существующего компонента с новым id и новым именем файла.
+     * Имя копии: "<name> copy", при конфликте — "<name> copy-1", "<name> copy-2", ...
+     * @return slug созданной копии
+     */
+    fun duplicateComponent(projectDir: Path, sourceSlug: String): String {
+        val sourcePath = projectDir.resolve("components").resolve("${sourceSlug}$CFCOMP_EXT")
+        val source = load(sourcePath)
 
+        val copyName = "${source.name} copy"
+        val newSlug = generateUniqueSlug(projectDir, copyName)
+        val newPath = projectDir.resolve("components").resolve("${newSlug}$CFCOMP_EXT")
+
+        val copy = source.copy(
+            id = java.util.UUID.randomUUID().toString(),
+            name = copyName
+        )
+        save(newPath, copy)
+        logger.info("Component duplicated: $sourceSlug -> $newSlug")
+        return newSlug
+    }
     /**
      * Сохраняет существующий компонент. Проверяет уникальность name,
      * переименовывает файл при смене slug.
