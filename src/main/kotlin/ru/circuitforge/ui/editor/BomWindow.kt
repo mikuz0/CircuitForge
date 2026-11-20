@@ -245,24 +245,18 @@ class BomWindow : ProjectAware {
 
     private fun showAddItemDialog() {
         val paths = projectPaths ?: return
-        val components = ComponentRepository.listComponents(paths.projectDir)
-        if (components.isEmpty()) {
-            UiUtils.errorAlert("Нет компонентов", "В проекте нет компонентов. Создайте их в редакторе компонентов.")
+        val summaries = ComponentRepository.listComponents(paths.projectDir)
+        if (summaries.isEmpty()) {
+            UiUtils.errorAlert(
+                I18n.tr("common.alert.error") ?: "Ошибка",
+                I18n.tr("bom.dialog.add.no.components") ?: "В проекте нет компонентов. Создайте их в редакторе компонентов."
+            )
             return
         }
 
-        val dialog = ChoiceDialog(components.first().name, components.map { it.name })
-        dialog.title = "Добавить элемент"
-        dialog.headerText = "Выберите компонент"
-        dialog.contentText = "Компонент:"
-
-        val result = dialog.showAndWait()
-        if (result.isPresent) {
-            val selectedName = result.get()
-            val comp = components.find { it.name == selectedName } ?: return
-
-            // Генерируем RefDes: prefix + maxNum + 1
-            val prefix = comp.refPrefix.uppercase()
+        AddBomItemDialog(stage, paths.projectDir) { selectedComponent ->
+            // Генерация RefDes: prefix + maxNum + 1
+            val prefix = selectedComponent.refPrefix.uppercase()
             val existingNums = bomRows.mapNotNull { row ->
                 if (row.refDes.startsWith(prefix)) {
                     row.refDes.removePrefix(prefix).toIntOrNull()
@@ -275,16 +269,16 @@ class BomWindow : ProjectAware {
                 bomnetId = UUID.randomUUID().toString(),
                 number = 0, // Пересчитается при сохранении
                 refDes = newRefDes,
-                componentId = comp.id,
-                componentSlug = comp.slug,
-                componentName = comp.name,
-                comment = "",
+                componentId = selectedComponent.componentId,
+                componentSlug = selectedComponent.componentSlug,
+                componentName = selectedComponent.componentName,
+                comment = selectedComponent.comment,
                 refPrefix = prefix
             )
             bomRows.add(newRow)
             markDirty()
-            logger.info("Added BOM item: $newRefDes (${comp.name})")
-        }
+            logger.info("Added BOM item: $newRefDes (${selectedComponent.componentName})")
+        }.show()
     }
 
     private fun duplicateRow() {
