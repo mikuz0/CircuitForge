@@ -25,6 +25,7 @@ import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
+import ru.circuitforge.ui.schematic.layout.ElkLayoutEngine
 import java.nio.file.Path
 import java.util.concurrent.Executors
 
@@ -60,6 +61,7 @@ class SchematicWindow : ProjectAware {
     private val saveButton = Button(I18n.tr("bom.btn.save") ?: "Сохранить")
     private val revertButton = Button(I18n.tr("bom.btn.revert") ?: "Отменить")
     private val syncButton = Button(I18n.tr("schematic.btn.sync") ?: "Синхронизировать")
+    private val autoLayoutButton = Button(I18n.tr("schematic.btn.auto_layout") ?: "Авто-раскладка")
     private val statusLabel = Label("")
 
     // Drag & Drop компонентов
@@ -117,7 +119,7 @@ class SchematicWindow : ProjectAware {
         scrollPane.isFitToHeight = false
 
         // Панель инструментов
-        val bottomBar = HBox(10.0, saveButton, revertButton, syncButton, statusLabel).apply {
+        val bottomBar = HBox(10.0, saveButton, revertButton, syncButton, autoLayoutButton, statusLabel).apply {
             alignment = Pos.CENTER_LEFT
             padding = Insets(8.0)
             style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
@@ -135,6 +137,7 @@ class SchematicWindow : ProjectAware {
         saveButton.setOnAction { saveSchematic() }
         revertButton.setOnAction { revertChanges() }
         syncButton.setOnAction { openSyncDialog() }
+        autoLayoutButton.setOnAction { runAutoLayout() }
     }
 
     private fun drawSchematic() {
@@ -566,6 +569,49 @@ class SchematicWindow : ProjectAware {
         }
     }
 
+    /** Запуск авто-раскладки ELK */
+    private fun runAutoLayout() {
+        if (bomRows.isEmpty() || componentsMap.isEmpty()) {
+            UiUtils.errorAlert(
+                I18n.tr("common.alert.error") ?: "Ошибка",
+                I18n.tr("schematic.error.no_components") ?: "Нет компонентов для раскладки"
+            )
+            return
+        }
+
+        statusLabel.text = I18n.tr("schematic.status.layout_running") ?: "Выполняется раскладка..."
+        statusLabel.style = "-fx-text-fill: orange;"
+
+        val task = object : Task<Unit>() {
+            override fun call() {
+                try {
+                    val engine = ElkLayoutEngine()
+                    val document = engine.layout(bomRows.toList(), nets.toList(), componentsMap)
+
+                    javafx.application.Platform.runLater {
+                        schematicNodes.setAll(document.nodes)
+                        drawSchematic()
+                        statusLabel.text = I18n.tr("schematic.status.layout_done")?.replace("{0}", document.nodes.size.toString())
+                            ?: "Раскладка завершена: ${document.nodes.size} компонентов"
+                        statusLabel.style = "-fx-text-fill: green;"
+                        logger.info("ELK auto-layout completed: ${document.nodes.size} components")
+                    }
+                } catch (e: Exception) {
+                    logger.error("ELK auto-layout failed", e)
+                    javafx.application.Platform.runLater {
+                        UiUtils.errorAlert(
+                            I18n.tr("common.alert.error") ?: "Ошибка",
+                            I18n.tr("schematic.error.layout_failed")?.replace("{0}", e.message ?: "Unknown")
+                                ?: "Ошибка раскладки: ${e.message}"
+                        )
+                        statusLabel.text = ""
+                    }
+                }
+            }
+        }
+        executor.submit(task)
+    }
+
     /** Открыть диалог синхронизации */
     private fun openSyncDialog() {
         val paths = projectPaths ?: return
@@ -837,10 +883,19 @@ class SchematicWindow : ProjectAware {
 
                 val existingDoc = SchematicRepository.load(paths)
                 if (existingDoc.nodes.isEmpty()) {
-                    logger.info("No schematic data found, generating grid layout")
-                    val nodes = generateGridCoordinates(rows)
-                    SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
-                    schematicNodes.setAll(nodes)
+                    logger.info("No schematic data found, running ELK auto-layout")
+                    try {
+                        val engine = ElkLayoutEngine()
+                        val document = engine.layout(rows, netDoc.nets, componentsMap)
+                        SchematicRepository.save(paths, document)
+                        schematicNodes.setAll(document.nodes)
+                        logger.info("ELK auto-layout completed: ${document.nodes.size} components")
+                    } catch (e: Exception) {
+                        logger.warn("ELK auto-layout failed, falling back to grid layout: ${e.message}", e)
+                        val nodes = generateGridCoordinates(rows)
+                        SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
+                        schematicNodes.setAll(nodes)
+                    }
                 } else {
                     schematicNodes.setAll(existingDoc.nodes)
                 }
