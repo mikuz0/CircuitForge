@@ -75,9 +75,20 @@ class ElkLayoutEngine {
                 println("Warning: Could not set ELK options: ${e.message}")
             }
             
-            // Вызываем layout
-            val layoutMethod = configuratorClass.getMethod("layout", org.eclipse.elk.graph.ElkGraphElement::class.java)
-            layoutMethod.invoke(configurator, root)
+            // Вызываем layout с правильной сигнатурой
+            // ELK 0.9.x использует: layout(Map<? extends IGraphElement, ? super IProperty<?>>, Collection<? extends IGraphElement>)
+            val layoutMethod = try {
+                configuratorClass.getMethod("layout",
+                    java.util.Map::class.java,
+                    java.util.Collection::class.java)
+            } catch (e: NoSuchMethodException) {
+                // Fallback на старый API
+                configuratorClass.getMethod("layout", org.eclipse.elk.graph.ElkGraphElement::class.java)
+            }
+            
+            @Suppress("UNCHECKED_CAST")
+            val optionsMap = configuratorClass.getField("options").get(configurator) as Map<*, *>
+            layoutMethod.invoke(configurator, optionsMap, listOf(root))
             
         } catch (e: ClassNotFoundException) {
             throw RuntimeException("ELK classes not found: ${e.message}", e)

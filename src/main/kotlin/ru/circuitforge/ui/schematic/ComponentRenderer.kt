@@ -1,10 +1,11 @@
 package ru.circuitforge.ui.schematic
 
 import javafx.scene.Group
+import javafx.scene.Node
 import javafx.scene.control.Label
+import javafx.scene.layout.Pane
 import javafx.scene.paint.Color
-import javafx.scene.shape.Line
-import javafx.scene.shape.Rectangle
+import javafx.scene.shape.*
 import ru.circuitforge.project.BomRow
 import ru.circuitforge.project.Component
 import ru.circuitforge.ui.schematic.symbols.SymbolRegistry
@@ -37,23 +38,68 @@ object ComponentRenderer {
     }
 
     /**
+     * Создаёт глубокую копию SVG-узла для избежания проблем с кэшированием.
+     */
+    private fun deepClone(node: Node): Node {
+        return when (node) {
+            is Pane -> {
+                val clone = Pane().apply {
+                    prefWidth = node.prefWidth
+                    prefHeight = node.prefHeight
+                    style = node.style
+                    node.children.forEach { child ->
+                        children.add(deepClone(child))
+                    }
+                }
+                clone
+            }
+            is Line -> {
+                Line(node.startXProperty().value, node.startYProperty().value,
+                     node.endXProperty().value, node.endYProperty().value).apply {
+                    stroke = node.stroke
+                    strokeWidth = node.strokeWidth
+                }
+            }
+            is Rectangle -> {
+                Rectangle(node.xProperty().value, node.yProperty().value,
+                         node.widthProperty().value, node.heightProperty().value).apply {
+                    fill = node.fill
+                    stroke = node.stroke
+                    strokeWidth = node.strokeWidth
+                }
+            }
+            is Circle -> {
+                Circle(node.centerXProperty().value, node.centerYProperty().value,
+                       node.radiusProperty().value).apply {
+                    fill = node.fill
+                    stroke = node.stroke
+                    strokeWidth = node.strokeWidth
+                }
+            }
+            is Path -> {
+                Path().apply {
+                    elements.addAll(node.elements)
+                    stroke = node.stroke
+                    fill = node.fill
+                    strokeWidth = node.strokeWidth
+                }
+            }
+            else -> {
+                // Для остальных узлов создаём новый экземпляр
+                node.javaClass.getDeclaredConstructor().newInstance() as Node
+            }
+        }
+    }
+
+    /**
      * Общая функция отрисовки SVG-символа с подписями.
      */
     private fun drawSvgSymbol(group: Group, row: BomRow, comp: Component, symbolName: String) {
         val registry = SymbolRegistry.getInstance()
-        val symbol = registry.getSymbol(symbolName) as javafx.scene.layout.Pane
+        val symbol = registry.getSymbol(symbolName) as Pane
         
-        // Клонируем SVG-узел (создаём копию children для избежания ConcurrentModificationException)
-        val symbolClone = javafx.scene.layout.Pane().apply {
-            // Создаём копию children списка перед итерацией
-            val childrenCopy = symbol.children.toList()
-            childrenCopy.forEach { node ->
-                // Добавляем узел (JavaFX автоматически удаляет из родителя при перемещении)
-                this.children.add(node)
-            }
-            prefWidth = symbol.prefWidth
-            prefHeight = symbol.prefHeight
-        }
+        // Создаём глубокую копию SVG-узла
+        val symbolClone = deepClone(symbol)
         
         group.children.add(symbolClone)
         
