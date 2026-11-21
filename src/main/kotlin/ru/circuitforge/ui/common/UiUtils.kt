@@ -1,5 +1,6 @@
 package ru.circuitforge.ui.common
 
+import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.property.StringProperty
 import javafx.scene.control.Alert
@@ -25,7 +26,8 @@ object UiUtils {
     fun pathLabel(pathProp: StringProperty): Label {
         val label = Label(pathProp.value)
         label.styleClass.add("path-label")
-        label.styleProperty().bind(pathProp.map { "-fx-font-family: monospace; -fx-text-fill: $PATH_COLOR" })
+        // Стиль фиксированный, не нужно биндить
+        label.style = "-fx-font-family: monospace; -fx-text-fill: $PATH_COLOR;"
         return label
     }
 

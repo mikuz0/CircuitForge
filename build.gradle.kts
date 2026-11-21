@@ -16,24 +16,29 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.slf4j:slf4j-simple:2.0.16")
 
+    // ELK Java — автоматическая раскладка схем
+    // org.eclipse.elk.properties не существует в Maven Central
+    implementation("org.eclipse.elk:org.eclipse.elk.core:0.9.1")
+    implementation("org.eclipse.elk:org.eclipse.elk.alg.layered:0.9.1")
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(17))
     }
 }
 
 javafx {
-    version = "21.0.4"
+    version = "17.0.10"
     modules = listOf(
         "javafx.controls",
         "javafx.fxml",

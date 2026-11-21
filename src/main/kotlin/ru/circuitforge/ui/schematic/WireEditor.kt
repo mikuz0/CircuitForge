@@ -6,6 +6,10 @@ import ru.circuitforge.project.SchematicNode
 
 /**
  * Утилита для расчёта координат портов компонентов.
+ * Координаты согласованы с SVG-символами:
+ * - Резистор: 80×40, ножки на x = ±40
+ * - Конденсатор: 80×50, ножки на x = ±40
+ * - IC: 120×80, ножки на x = ±60
  */
 object PortCalculator {
 
@@ -27,32 +31,34 @@ object PortCalculator {
 
         when (comp.name.lowercase()) {
             "resistor" -> {
-                if (portIndex == 0) { baseX = node.x - 50.0; baseY = node.y }
-                else if (portIndex == 1) { baseX = node.x + 50.0; baseY = node.y }
+                // SVG: 80×40, ножки на x = ±40
+                if (portIndex == 0) { baseX = node.x - 40.0; baseY = node.y }
+                else if (portIndex == 1) { baseX = node.x + 40.0; baseY = node.y }
                 else return null
             }
             "capacitor" -> {
-                if (portIndex == 0) { baseX = node.x - 50.0; baseY = node.y }
-                else if (portIndex == 1) { baseX = node.x + 50.0; baseY = node.y }
+                // SVG: 80×50, ножки на x = ±40
+                if (portIndex == 0) { baseX = node.x - 40.0; baseY = node.y }
+                else if (portIndex == 1) { baseX = node.x + 40.0; baseY = node.y }
                 else return null
             }
             else -> {
+                // SVG: 120×80, ножки на x = ±60
                 val allPorts = comp.ports
                 val mid = (allPorts.size + 1) / 2
                 val isLeft = portIndex < mid
                 val indexInHalf = if (isLeft) portIndex else portIndex - mid
 
                 val portSpacing = 25.0
-                val paddingTop = 50.0
-                val paddingBottom = 50.0
-                val minHeight = 100.0
+                val paddingTop = 20.0
+                val paddingBottom = 20.0
+                val minHeight = 60.0
 
                 val maxPorts = maxOf(mid, allPorts.size - mid)
                 val height = maxOf(minHeight, (paddingTop + maxPorts * portSpacing + paddingBottom))
-                val width = 150.0
 
                 val pinY = -height / 2 + paddingTop + indexInHalf * portSpacing
-                val pinX = if (isLeft) -100.0 else 100.0
+                val pinX = if (isLeft) -60.0 else 60.0
 
                 baseX = node.x + pinX
                 baseY = node.y + pinY
