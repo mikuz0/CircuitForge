@@ -43,9 +43,12 @@ object ComponentRenderer {
         val registry = SymbolRegistry.getInstance()
         val symbol = registry.getSymbol(symbolName) as javafx.scene.layout.Pane
         
-        // Клонируем SVG-узел (упрощённо)
+        // Клонируем SVG-узел (создаём копию children для избежания ConcurrentModificationException)
         val symbolClone = javafx.scene.layout.Pane().apply {
-            symbol.children.forEach { node ->
+            // Создаём копию children списка перед итерацией
+            val childrenCopy = symbol.children.toList()
+            childrenCopy.forEach { node ->
+                // Добавляем узел (JavaFX автоматически удаляет из родителя при перемещении)
                 this.children.add(node)
             }
             prefWidth = symbol.prefWidth

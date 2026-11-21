@@ -41,25 +41,41 @@ class ElkLayoutEngine {
         // Используем Reflection для вызова LayoutConfigurator
         try {
             val configuratorClass = Class.forName("org.eclipse.elk.core.LayoutConfigurator")
-            val instanceMethod = configuratorClass.getMethod("getInstance")
-            val configurator = instanceMethod.invoke(null)
             
-            // Устанавливаем направление
-            val optionsProperty = configuratorClass.getField("options")
-            val options = optionsProperty.get(configurator)
+            // Пробуем разные варианты получения экземпляра
+            val configurator = try {
+                // ELK 0.9.x - используем getInstance()
+                val instanceMethod = configuratorClass.getMethod("getInstance")
+                instanceMethod.invoke(null)
+            } catch (e: NoSuchMethodException) {
+                // ELK 0.8.x - используем конструктор
+                configuratorClass.getDeclaredConstructor().newInstance()
+            }
             
-            // Получаем LayeredOptions.DIRECTION
-            val layeredOptionsClass = Class.forName("org.eclipse.elk.alg.layered.options.LayeredOptions")
-            val directionField = layeredOptionsClass.getField("DIRECTION")
-            val directionProperty = directionField.get(null)
-            
-            // Получаем Direction.WEST_TO_EAST
-            val directionClass = Class.forName("org.eclipse.elk.core.options.Direction")
-            val westToEastField = directionClass.getField("WEST_TO_EAST")
-            val westToEast = westToEastField.get(null)
+            // Устанавливаем свойства через options map
+            try {
+                val optionsProperty = configuratorClass.getField("options")
+                val options = optionsProperty.get(configurator)
+                
+                // Получаем LayeredOptions.DIRECTION
+                val layeredOptionsClass = Class.forName("org.eclipse.elk.alg.layered.options.LayeredOptions")
+                val directionField = layeredOptionsClass.getField("DIRECTION")
+                val directionProperty = directionField.get(null)
+                
+                // Получаем Direction.WEST_TO_EAST
+                val directionClass = Class.forName("org.eclipse.elk.core.options.Direction")
+                val westToEastField = directionClass.getField("WEST_TO_EAST")
+                val westToEast = westToEastField.get(null)
+                
+                @Suppress("UNCHECKED_CAST")
+                val optionsMap = options as MutableMap<Any?, Any?>
+                optionsMap[directionProperty] = westToEast
+            } catch (e: Exception) {
+                // Игнорируем ошибки установки свойств - используются значения по умолчанию
+                println("Warning: Could not set ELK options: ${e.message}")
+            }
             
             // Вызываем layout
-            @Suppress("UNCHECKED_CAST")
             val layoutMethod = configuratorClass.getMethod("layout", org.eclipse.elk.graph.ElkGraphElement::class.java)
             layoutMethod.invoke(configurator, root)
             
