@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Конденсатор: 80×50, пластины на y = ±12.5, ножки вверх/вниз -->
+<!-- Конденсатор: 80×50, пластины вертикальные, ножки слева/справа -->
 <svg xmlns="http://www.w3.org/2000/svg" width="80" height="50" viewBox="-40 -25 80 50">
-  <!-- Верхняя ножка -->
-  <line x1="0" y1="-25" x2="0" y2="-12.5" stroke="black" stroke-width="2"/>
-  <!-- Нижняя ножка -->
-  <line x1="0" y1="12.5" x2="0" y2="25" stroke="black" stroke-width="2"/>
-  <!-- Верхняя пластина -->
-  <line x1="-10" y1="-12.5" x2="10" y2="-12.5" stroke="black" stroke-width="3"/>
-  <!-- Нижняя пластина -->
-  <line x1="-10" y1="12.5" x2="10" y2="12.5" stroke="black" stroke-width="3"/>
+  <!-- Левая ножка -->
+  <line x1="-40" y1="0" x2="-12.5" y2="0" stroke="black" stroke-width="2"/>
+  <!-- Правая ножка -->
+  <line x1="12.5" y1="0" x2="40" y2="0" stroke="black" stroke-width="2"/>
+  <!-- Левая пластина -->
+  <line x1="-12.5" y1="-20" x2="-12.5" y2="20" stroke="black" stroke-width="3"/>
+  <!-- Правая пластина -->
+  <line x1="12.5" y1="-20" x2="12.5" y2="20" stroke="black" stroke-width="3"/>
 </svg>
