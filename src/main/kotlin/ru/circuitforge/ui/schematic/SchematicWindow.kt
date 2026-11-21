@@ -249,16 +249,17 @@ class SchematicWindow : ProjectAware {
                 }
                 if (!hasActivePort) return@forEach
 
+                // Собираем координаты ТОЛЬКО для найденных портов
                 val portCoords = mutableListOf<Pair<String, Pair<Double, Double>>>()
                 net.connections.forEach { conn ->
-                    val row = bomRows.find { it.refDes == conn.refDes } ?: return@forEach
-                    val coords = PortCalculator.getPortCoordinates(nodesMap, componentsMap, row, conn.pinNumber)
+                    val coords = getPinCoordinates(conn.refDes, conn.pinNumber)
                     if (coords != null) {
                         portCoords.add(portKey(conn.refDes, conn.pinNumber) to coords)
                     }
                 }
 
-                if (portCoords.isEmpty()) return@forEach
+                // Рисуем линии только если найдено минимум 2 точки
+                if (portCoords.size < 2) return@forEach
 
                 val netColor = netColor(net.name)
                 val activePortKey = portKey(activeRefDes, activePin)
@@ -289,6 +290,9 @@ class SchematicWindow : ProjectAware {
                 }
             }
         }
+
+        // Рисуем метки для всех цепей с активными портами и labelMode
+        drawNetLabelsForActivePorts(activePorts)
     }
 
     private fun controlPoint(start: Pair<Double, Double>, end: Pair<Double, Double>, offset: Double): Pair<Double, Double> {
@@ -305,6 +309,80 @@ class SchematicWindow : ProjectAware {
         val midY = start.second + dy * t
 
         return Pair(midX + nx * offset, midY + ny * offset)
+    }
+
+    /**
+     * Получает координаты пина по refDes и pinNumber.
+     */
+    private fun getPinCoordinates(refDes: String, pinNumber: String): Pair<Double, Double>? {
+        val key = portKey(refDes, pinNumber)
+        val circle = portCircles[key] ?: return null
+        // Круги позиционированы относительно portPane, используем getLayoutX/Y напрямую
+        return Pair(circle.layoutX, circle.layoutY)
+    }
+
+    /**
+     * Рисует текстовые метки у каждого пина для цепей с labelMode.
+     */
+    private fun drawNetLabelsForActivePorts(activePorts: Set<String>) {
+        // Находим цепи, которые содержат активные порты И включённую метку
+        val activeNets = nets.filter { net ->
+            net.labelMode && net.connections.any { conn ->
+                activePorts.contains(portKey(conn.refDes, conn.pinNumber))
+            }
+        }
+
+        activeNets.forEach { net ->
+            // Рисуем метки только для найденных пинов
+            val drawnPins = mutableListOf<String>()
+            net.connections.forEach { conn ->
+                val pinCoords = getPinCoordinates(conn.refDes, conn.pinNumber) ?: return@forEach
+                val row = bomRows.find { it.refDes == conn.refDes } ?: return@forEach
+                val comp = componentsMap[row.componentId] ?: return@forEach
+                val node = nodesMap[row.bomnetId] ?: return@forEach
+
+                val direction = getPinDirection(comp, conn.pinNumber, node)
+
+                val offset = 12.0
+                val fontSize = 10.0
+                val netColorObj = netColor(net.name)
+                val colorCss = String.format("#%02X%02X%02X", (netColorObj.red * 255).toInt(), (netColorObj.green * 255).toInt(), (netColorObj.blue * 255).toInt())
+
+                val label = Label(net.name).apply {
+                    style = "-fx-font-size: $fontSize; -fx-font-family: SansSerif; -fx-text-fill: $colorCss;"
+                    layoutX = when (direction) {
+                        PinDirection.LEFT -> pinCoords.first - offset - 40
+                        PinDirection.RIGHT -> pinCoords.first + offset
+                        PinDirection.TOP, PinDirection.BOTTOM -> pinCoords.first - 30
+                    }
+                    layoutY = when (direction) {
+                        PinDirection.LEFT, PinDirection.RIGHT -> pinCoords.second - 5
+                        PinDirection.TOP -> pinCoords.second - offset - 10
+                        PinDirection.BOTTOM -> pinCoords.second + offset
+                    }
+                }
+                linePane.children.add(label)
+                drawnPins.add(portKey(conn.refDes, conn.pinNumber))
+            }
+            // Метки рисуются даже если не все пины найдены
+        }
+    }
+
+    /**
+     * Определяет направление пина компонента.
+     */
+    private fun getPinDirection(comp: Component, pinNumber: String, node: SchematicNode): PinDirection {
+        val port = comp.ports.find { it.pinNumber == pinNumber } ?: return PinDirection.RIGHT
+        val portIndex = comp.ports.indexOf(port)
+
+        return when (comp.name.lowercase()) {
+            "resistor" -> if (portIndex == 0) PinDirection.LEFT else PinDirection.RIGHT
+            "capacitor" -> if (portIndex == 0) PinDirection.TOP else PinDirection.BOTTOM
+            else -> {
+                val mid = (comp.ports.size + 1) / 2
+                if (portIndex < mid) PinDirection.LEFT else PinDirection.RIGHT
+            }
+        }
     }
 
     private fun netColor(name: String): Color {
@@ -791,4 +869,11 @@ class SchematicWindow : ProjectAware {
     }
 
     override fun getStage(): Stage = stage
+}
+
+/**
+ * Направление пина компонента.
+ */
+enum class PinDirection {
+    LEFT, RIGHT, TOP, BOTTOM
 }

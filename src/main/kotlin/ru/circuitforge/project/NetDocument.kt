@@ -22,7 +22,8 @@ data class NetConnection(
 data class Net(
     val name: String = "",
     @EncodeDefault(ALWAYS)
-    val connections: List<NetConnection> = emptyList()
+    val connections: List<NetConnection> = emptyList(),
+    var labelMode: Boolean = false
 )
 
 /**
