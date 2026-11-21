@@ -29,8 +29,9 @@ class ElkLayoutEngine {
         
         // Парсим результаты
         val nodes = parseNodes(elkGraph, bomRows)
+        val wires = parseWires(elkGraph, nets, bomRows)
         
-        return SchematicDocument(nodes = nodes)
+        return SchematicDocument(nodes = nodes, wires = wires)
     }
     
     /**
@@ -97,6 +98,77 @@ class ElkLayoutEngine {
         }
         
         return result
+    }
+    
+    /**
+     * Парсит провода (wires) из ELK-графа с bend points.
+     */
+    private fun parseWires(
+        root: org.eclipse.elk.graph.ElkNode,
+        nets: List<Net>,
+        bomRows: List<BomRow>
+    ): List<WireConnection> {
+        val result = mutableListOf<WireConnection>()
+        
+        // Map refDes -> bomnetId
+        val refDesToBomnetId = bomRows.associateBy { it.refDes }
+        
+        // Проходим по всем рёбрам в корневом узле
+        for (edge in root.containedEdges) {
+            val edgeId = edge.identifier ?: continue
+            
+            // Парсим net name из edge identifier (format: "netName_edge_i")
+            val netName = edgeId.substringBefore("_edge_")
+            
+            // Получаем source и target nodes
+            val sourceNode = edge.sources.firstOrNull()
+            val targetNode = edge.targets.lastOrNull()
+            
+            if (sourceNode == null || targetNode == null) continue
+            
+            val sourceBomnetId = sourceNode.identifier
+            val targetBomnetId = targetNode.identifier
+            
+            // Находим refDes по bomnetId
+            val sourceRefDes = bomRows.find { it.bomnetId == sourceBomnetId }?.refDes ?: continue
+            val targetRefDes = bomRows.find { it.bomnetId == targetBomnetId }?.refDes ?: continue
+            
+            // Извлекаем bend points из edge sections
+            val bendPoints = parseBendPoints(edge)
+            
+            // Создаём WireConnection
+            result.add(WireConnection(
+                id = edgeId,
+                netName = netName,
+                refDesFrom = sourceRefDes,
+                pinFrom = "",
+                refDesTo = targetRefDes,
+                pinTo = "",
+                bendPoints = bendPoints
+            ))
+        }
+        
+        return result
+    }
+    
+    /**
+     * Извлекает bend points из ELK-рёбра.
+     */
+    private fun parseBendPoints(edge: org.eclipse.elk.graph.ElkEdge): List<WireBendPoint> {
+        val bendPoints = mutableListOf<WireBendPoint>()
+        
+        // Проходим по всем секциям edge
+        for (section in edge.sections) {
+            // Извлекаем bend points из секции
+            for (bp in section.bendPoints) {
+                bendPoints.add(WireBendPoint(
+                    x = bp.x ?: 0.0,
+                    y = bp.y ?: 0.0
+                ))
+            }
+        }
+        
+        return bendPoints
     }
     
     /**
