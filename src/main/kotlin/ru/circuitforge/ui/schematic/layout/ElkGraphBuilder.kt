@@ -9,8 +9,15 @@ import org.eclipse.elk.core.options.PortSide
 import ru.circuitforge.project.BomRow
 import ru.circuitforge.project.Component
 import ru.circuitforge.project.Net
+import ru.circuitforge.ui.schematic.symbols.SymbolLibrary
 
-class ElkGraphBuilder {
+/**
+ * Строит ELK-граф из BOM + Nets для автоматической раскладки схемы.
+ * Использует SymbolLibrary для размеров и позиций портов.
+ */
+class ElkGraphBuilder(
+    private val symbolLibrary: SymbolLibrary? = null
+) {
 
     private val nodeMap = mutableMapOf<String, org.eclipse.elk.graph.ElkNode>()
     private val refDesMap = mutableMapOf<String, String>()
@@ -76,11 +83,25 @@ class ElkGraphBuilder {
         val portNode = factory.createElkPort()
         portNode.identifier = "${row.bomnetId}:port:${port.pinNumber}"
 
-        val portIndex = component.ports.indexOfFirst { it.pinNumber == port.pinNumber }
-        val mid = (component.ports.size + 1) / 2
-        val isLeft = portIndex < mid
-
-        val portSide = if (isLeft) PortSide.WEST else PortSide.EAST
+        // Определяем сторону порта из SymbolLibrary
+        val symbolType = symbolLibrary?.getSymbolType(component.name)
+        val portPosition = symbolType?.let { symbolLibrary.getPortPosition(it, port.pinNumber) }
+        
+        val portSide = if (portPosition != null) {
+            // Если порт сверху/снизу — используем PortSide.NORTH/SOUTH
+            when {
+                portPosition.second < 0 -> PortSide.NORTH
+                portPosition.second > 0 -> PortSide.SOUTH
+                portPosition.first < 0 -> PortSide.WEST
+                else -> PortSide.EAST
+            }
+        } else {
+            // Fallback — распределяем по бокам
+            val portIndex = component.ports.indexOfFirst { it.pinNumber == port.pinNumber }
+            val mid = (component.ports.size + 1) / 2
+            if (portIndex < mid) PortSide.WEST else PortSide.EAST
+        }
+        
         portNode.properties.put(LayeredOptions.PORT_SIDE, portSide)
 
         node.ports.add(portNode)
@@ -119,6 +140,13 @@ class ElkGraphBuilder {
     }
 
     private fun getComponentSize(component: Component?): Pair<Double, Double> {
+        // Сначала пробуем через SymbolLibrary
+        symbolLibrary?.let { lib ->
+            val symbolType = lib.getSymbolType(component?.name ?: "")
+            lib.getSymbolSize(symbolType)?.let { return it }
+        }
+        
+        // Fallback — дефолтные размеры
         return when (component?.name?.lowercase()) {
             "resistor" -> Pair(80.0, 40.0)
             "capacitor" -> Pair(80.0, 50.0)

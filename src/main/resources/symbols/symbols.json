@@ -1,0 +1,28 @@
+{
+  "symbols": {
+    "resistor": {
+      "file": "resistor.svg",
+      "width": 80.0,
+      "height": 40.0,
+      "ports": {
+        "1": { "x": 0.0,  "y": 20.0 },
+        "2": { "x": 80.0, "y": 20.0 }
+      }
+    },
+    "capacitor": {
+      "file": "capacitor.svg",
+      "width": 80.0,
+      "height": 50.0,
+      "ports": {
+        "1": { "x": 0.0,  "y": 25.0 },
+        "2": { "x": 80.0, "y": 25.0 }
+      }
+    }
+  },
+  "mappings": {
+    "Resistor": "resistor",
+    "resistor": "resistor",
+    "Capacitor": "capacitor",
+    "capacitor": "capacitor"
+  }
+}

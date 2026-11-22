@@ -1,43 +1,72 @@
 package ru.circuitforge.ui.schematic
 
+import com.github.weisj.jsvg.SVGDocument
+import com.github.weisj.jsvg.ui.jfx.FXSVGCanvas
 import javafx.scene.Group
-import javafx.scene.Node
 import javafx.scene.control.Label
 import javafx.scene.layout.Pane
-import javafx.scene.shape.*
+import org.slf4j.LoggerFactory
 import ru.circuitforge.project.BomRow
 import ru.circuitforge.project.Component
 import ru.circuitforge.ui.schematic.symbols.SymbolRegistry
+import ru.circuitforge.ui.schematic.symbols.SvgParser
 
 /**
  * Рендерер компонентов для схемы.
- * Использует SVG-символы из SymbolRegistry.
+ * Использует SVG-символы из SymbolRegistry с JSVG для рендеринга.
  */
+
 object ComponentRenderer {
+    private val logger = LoggerFactory.getLogger(ComponentRenderer::class.java)
+    private val svgParser = SvgParser()
 
-    fun drawCustomResistor(group: Group, row: BomRow, comp: Component) {
-        drawSvgSymbol(group, row, comp, "resistor")
-    }
-
-    fun drawCustomCapacitor(group: Group, row: BomRow, comp: Component) {
-        drawSvgSymbol(group, row, comp, "capacitor")
-    }
-
-    fun drawDefaultComponent(group: Group, row: BomRow, comp: Component) {
-        drawSvgSymbol(group, row, comp, "default")
+    /**
+     * Отрисовка компонента с автоматическим определением типа символа.
+     * Использует SymbolRegistry для маппинга Component.name → symbolType.
+     */
+    fun drawComponent(group: Group, row: BomRow, comp: Component) {
+        val registry = SymbolRegistry.getInstance()
+        val symbolType = registry.getSymbolType(comp.name)
+        drawSvgSymbol(group, row, comp, symbolType)
     }
 
     /**
      * Общая функция отрисовки SVG-символа с подписями.
-     * Клонирование узлов теперь происходит здесь, с сохранением всех размеров.
+     * FXSVGCanvas рендерит SVGDocument напрямую в JavaFX.
      */
-    private fun drawSvgSymbol(group: Group, row: BomRow, comp: Component, symbolName: String) {
+    private fun drawSvgSymbol(group: Group, row: BomRow, comp: Component, symbolType: String) {
         val registry = SymbolRegistry.getInstance()
-        val originalSymbol = registry.getSymbol(symbolName) as Pane
-
-        // Клонируем символ с сохранением всех свойств и вложенных узлов
-        val symbolClone = clonePane(originalSymbol)
-        group.children.add(symbolClone)
+        val originalSymbolPane = registry.getSymbol(symbolType) as Pane
+        
+        // Получаем SVGDocument и оригинальную строку
+        val svgData = svgParser.getSvgData(originalSymbolPane)
+        
+        // Клонируем SVGDocument или создаём fallback
+        val canvas = if (svgData != null) {
+            try {
+                val clonedDoc = svgParser.cloneSvgDocument(svgData.first, svgData.second)
+                val canvas = svgParser.createFxSvgCanvas(clonedDoc)
+                
+                // Устанавливаем размеры
+                val symbolWidth = originalSymbolPane.prefWidth.takeIf { it > 0.0 } ?: 100.0
+                val symbolHeight = originalSymbolPane.prefHeight.takeIf { it > 0.0 } ?: 80.0
+                canvas.prefWidth = symbolWidth
+                canvas.prefHeight = symbolHeight
+                canvas.minWidth = symbolWidth
+                canvas.minHeight = symbolHeight
+                canvas.maxWidth = symbolWidth
+                canvas.maxHeight = symbolHeight
+                
+                canvas
+            } catch (e: Exception) {
+                logger.warn("Failed to clone SVG, using fallback: ${e.message}")
+                svgParser.createEmptyCanvas()
+            }
+        } else {
+            svgParser.createEmptyCanvas()
+        }
+        
+        group.children.add(canvas)
 
         // Подписи RefDes и Comment
         val refDesLabel = Label(row.refDes).apply {
@@ -54,82 +83,20 @@ object ComponentRenderer {
         }
         group.children.add(commentLabel)
 
-        // Номера пинов
-        comp.ports.forEachIndexed { index, port ->
+        // Номера пинов — по реальным координатам из конфига
+// Номера пинов — по реальным координатам из конфига
+// Номера пинов — по реальным координатам из конфига
+        val (symW, symH) = registry.getSymbolSize(comp.name)
+        comp.ports.forEach { port ->
+            val portPos = registry.getPortPosition(comp.name, port.pinNumber) ?: return@forEach
+            val (px, py) = portPos
             val pinLabel = Label(port.pinNumber).apply {
                 style = "-fx-font-size: 9px; -fx-text-fill: black;"
-                layoutX = if (index % 2 == 0) -55.0 else 40.0
-                layoutY = -10.0 + index * 15.0
+                // слева от символа или справа — в зависимости от стороны порта
+                layoutX = if (px < symW / 2) px - 12.0 else px + 4.0
+                layoutY = py - 4.0
             }
             group.children.add(pinLabel)
-        }
-    }
-
-    /**
-     * Безопасное клонирование Pane со всеми вложенными элементами (Group, Rect, Line, Path и т.д.)
-     */
-    private fun clonePane(source: Pane): Pane {
-        val clone = Pane().apply {
-            prefWidth = source.prefWidth
-            prefHeight = source.prefHeight
-            isManaged = false
-            isPickOnBounds = false
-        }
-
-        source.children.forEach { child ->
-            clone.children.add(cloneNode(child))
-        }
-        return clone
-    }
-
-    /**
-     * Рекурсивное клонирование отдельного узла с сохранением размеров и координат.
-     */
-    private fun cloneNode(node: Node): Node {
-        return when (node) {
-            is Group -> {
-                val group = Group()
-                node.children.forEach { child ->
-                    group.children.add(cloneNode(child))
-                }
-                group
-            }
-            is Rectangle -> {
-                Rectangle(node.x, node.y, node.width, node.height).apply {
-                    fill = node.fill
-                    stroke = node.stroke
-                    strokeWidth = node.strokeWidth
-                }
-            }
-            is Line -> {
-                Line(node.startX, node.startY, node.endX, node.endY).apply {
-                    stroke = node.stroke
-                    strokeWidth = node.strokeWidth
-                }
-            }
-            is Circle -> {
-                Circle(node.centerX, node.centerY, node.radius).apply {
-                    fill = node.fill
-                    stroke = node.stroke
-                    strokeWidth = node.strokeWidth
-                }
-            }
-            is Ellipse -> {
-                Ellipse(node.centerX, node.centerY, node.radiusX, node.radiusY).apply {
-                    fill = node.fill
-                    stroke = node.stroke
-                    strokeWidth = node.strokeWidth
-                }
-            }
-            is Path -> {
-                Path().apply {
-                    elements.setAll(node.elements)
-                    fill = node.fill
-                    stroke = node.stroke
-                    strokeWidth = node.strokeWidth
-                }
-            }
-            else -> node // Для неизвестных узлов просто возвращаем как есть
         }
     }
 

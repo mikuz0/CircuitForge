@@ -26,6 +26,7 @@ import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
 import ru.circuitforge.ui.schematic.layout.ElkLayoutEngine
+import ru.circuitforge.ui.schematic.symbols.SymbolRegistry
 import java.nio.file.Path
 import java.util.concurrent.Executors
 
@@ -422,17 +423,19 @@ class SchematicWindow : ProjectAware {
     /**
      * Определяет направление пина компонента.
      */
-    private fun getPinDirection(comp: Component, pinNumber: String, node: SchematicNode): PinDirection {
-        val port = comp.ports.find { it.pinNumber == pinNumber } ?: return PinDirection.RIGHT
-        val portIndex = comp.ports.indexOf(port)
 
-        return when (comp.name.lowercase()) {
-            "resistor" -> if (portIndex == 0) PinDirection.LEFT else PinDirection.RIGHT
-            "capacitor" -> if (portIndex == 0) PinDirection.TOP else PinDirection.BOTTOM
-            else -> {
-                val mid = (comp.ports.size + 1) / 2
-                if (portIndex < mid) PinDirection.LEFT else PinDirection.RIGHT
-            }
+    private fun getPinDirection(comp: Component, pinNumber: String, node: SchematicNode): PinDirection {
+        val registry = SymbolRegistry.getInstance()
+        val portPos = registry.getPortPosition(comp.name, pinNumber) ?: return PinDirection.RIGHT
+        val (symW, symH) = registry.getSymbolSize(comp.name)
+        val (px, py) = portPos
+        val dx = px - symW / 2.0
+        val dy = py - symH / 2.0
+        return when {
+            kotlin.math.abs(dx) >= kotlin.math.abs(dy) ->
+                if (dx < 0) PinDirection.LEFT else PinDirection.RIGHT
+            else ->
+                if (dy < 0) PinDirection.TOP else PinDirection.BOTTOM
         }
     }
 
@@ -468,11 +471,7 @@ class SchematicWindow : ProjectAware {
             val comp = componentsMap[row.componentId] ?: return@forEach
             val group = Group()
 
-            when (comp.name.lowercase()) {
-                "resistor" -> ComponentRenderer.drawCustomResistor(group, row, comp)
-                "capacitor" -> ComponentRenderer.drawCustomCapacitor(group, row, comp)
-                else -> ComponentRenderer.drawDefaultComponent(group, row, comp)
-            }
+            ComponentRenderer.drawComponent(group, row, comp)
 
             group.layoutX = node.x
             group.layoutY = node.y
@@ -917,6 +916,7 @@ class SchematicWindow : ProjectAware {
             return
         }
         this.projectPaths = paths
+        SymbolRegistry.initialize(paths.projectDir)
         stage.title = "CircuitForge — Schematic — $projectPath"
 
         val loadTask = object : Task<Unit>() {
