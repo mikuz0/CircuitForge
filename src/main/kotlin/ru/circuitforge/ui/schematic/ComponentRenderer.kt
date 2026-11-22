@@ -84,17 +84,17 @@ object ComponentRenderer {
         group.children.add(commentLabel)
 
         // Номера пинов — по реальным координатам из конфига
-// Номера пинов — по реальным координатам из конфига
-// Номера пинов — по реальным координатам из конфига
         val (symW, symH) = registry.getSymbolSize(comp.name)
         comp.ports.forEach { port ->
             val portPos = registry.getPortPosition(comp.name, port.pinNumber) ?: return@forEach
             val (px, py) = portPos
+            // px/py — координаты SVG относительно top-left -> координаты внутри canvas
+            val canvasX = px
+            val canvasY = py
             val pinLabel = Label(port.pinNumber).apply {
                 style = "-fx-font-size: 9px; -fx-text-fill: black;"
-                // слева от символа или справа — в зависимости от стороны порта
-                layoutX = if (px < symW / 2) px - 12.0 else px + 4.0
-                layoutY = py - 4.0
+                layoutX = if (px < symW / 2) canvasX - 12.0 else canvasX + 4.0
+                layoutY = canvasY - 4.0
             }
             group.children.add(pinLabel)
         }

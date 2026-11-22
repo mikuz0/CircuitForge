@@ -40,7 +40,8 @@ class SymbolLibrary private constructor(
                     val content = Files.readString(configFile)
                     json.decodeFromString(SymbolConfig.serializer(), content)
                 } else {
-                    SymbolConfig()
+                    // Fallback: загрузка дефолтного конфига из resources
+                    loadDefaultConfig() ?: SymbolConfig()
                 }
             } catch (e: Exception) {
                 LoggerFactory.getLogger(SymbolLibrary::class.java)
@@ -49,6 +50,23 @@ class SymbolLibrary private constructor(
             }
             
             return SymbolLibrary(symbolsDir, config)
+        }
+        
+        /**
+         * Загружает дефолтный конфиг из resources/symbols/symbols.json.
+         */
+        private fun loadDefaultConfig(): SymbolConfig? {
+            val resourcePath = "/symbols/symbols.json"
+            val inputStream = javaClass.getResourceAsStream(resourcePath) ?: return null
+            
+            return try {
+                val content = inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                json.decodeFromString(SymbolConfig.serializer(), content)
+            } catch (e: Exception) {
+                LoggerFactory.getLogger(SymbolLibrary::class.java)
+                    .warn("Failed to load default symbol config from resources: ${e.message}")
+                null
+            }
         }
     }
     
@@ -101,13 +119,18 @@ class SymbolLibrary private constructor(
         val definition = config.symbols[symbolType]
         
         return if (definition != null) {
-            // Загружаем из project symbols
             val svgFile = symbolsDir.resolve(definition.file)
-            loadSymbolFromFile(symbolType, svgFile, definition.width, definition.height)
+            if (Files.exists(svgFile)) {
+                loadSymbolFromFile(symbolType, svgFile, definition.width, definition.height)
+            } else {
+                // SVG не найден в проекте — fallback на resources
+                logger.info("SVG file not found: $svgFile, loading from resources")
+                loadSymbolFromResources(symbolType, definition.width, definition.height)
+                    ?: createFallbackPane(symbolType)
+            }
         } else {
-            // Fallback: загружаем из resources
-            val resourcePane = loadSymbolFromResources(symbolType)
-            resourcePane ?: createFallbackPane(symbolType)
+            loadSymbolFromResources(symbolType, 80.0, 40.0)
+                ?: createFallbackPane(symbolType)
         }
     }
     
@@ -138,15 +161,15 @@ class SymbolLibrary private constructor(
     /**
      * Загружает SVG-символ из resources.
      */
-    private fun loadSymbolFromResources(symbolType: String): Pane? {
+    private fun loadSymbolFromResources(symbolType: String, width: Double, height: Double): Pane? {
         val resourcePath = "/symbols/${symbolType}.svg"
         val inputStream = javaClass.getResourceAsStream(resourcePath) ?: return null
         
         return try {
             val svgContent = inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             val pane = parser.parse(svgContent)
-            pane.prefWidth = 80.0
-            pane.prefHeight = 40.0
+            pane.prefWidth = width
+            pane.prefHeight = height
             logger.debug("Loaded symbol $symbolType from resources: $resourcePath")
             pane
         } catch (e: Exception) {

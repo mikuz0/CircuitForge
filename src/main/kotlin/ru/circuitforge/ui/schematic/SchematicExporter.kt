@@ -129,16 +129,22 @@ class SchematicExporter {
         val portPos = registry.getPortPosition(comp.name, pinNumber)
 
         return if (portPos != null) {
-            var baseX = node.x + portPos.first
-            var baseY = node.y + portPos.second
+            val (symW, symH) = registry.getSymbolSize(comp.name) ?: Pair(80.0, 40.0)
+            val centerX = node.x + symW / 2.0
+            val centerY = node.y + symH / 2.0
+            val (portX, portY) = portPos
+
+            // portX/portY — координаты SVG относительно top-left
+            var baseX = node.x + portX
+            var baseY = node.y + portY
 
             // Применяем поворот, если компонент повёрнут
             if (node.rotation != 0.0) {
                 val rad = Math.toRadians(node.rotation)
-                val dx = baseX - node.x
-                val dy = baseY - node.y
-                baseX = node.x + dx * Math.cos(rad) - dy * Math.sin(rad)
-                baseY = node.y + dx * Math.sin(rad) + dy * Math.cos(rad)
+                val dx = baseX - centerX
+                val dy = baseY - centerY
+                baseX = centerX + dx * Math.cos(rad) - dy * Math.sin(rad)
+                baseY = centerY + dx * Math.sin(rad) + dy * Math.cos(rad)
             }
             Pair(baseX, baseY)
         } else {

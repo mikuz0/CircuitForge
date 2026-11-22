@@ -215,7 +215,7 @@ class SchematicWindow : ProjectAware {
                 val key = portKey(row.refDes, port.pinNumber)
                 if (!connectedPorts.contains(key)) return@forEach
 
-                val coords = PortCalculator.getPortCoordinates(nodesMap, componentsMap, row, port.pinNumber)
+                val coords = PortCalculator.getPortCoordinatesWithRotation(nodesMap, componentsMap, row, port.pinNumber)
                 if (coords != null) {
                     val circle = Circle(coords.first, coords.second, 5.0).apply {
                         fill = if (activePorts.contains(key)) Color.web("#F44336") else Color.web("#2196F3")
