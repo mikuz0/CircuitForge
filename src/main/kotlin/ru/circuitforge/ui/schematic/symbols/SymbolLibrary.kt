@@ -29,27 +29,49 @@ class SymbolLibrary private constructor(
         
         /**
          * Создаёт SymbolLibrary из директории проекта.
-         * Пытается загрузить symbols.json, если нет — использует пустой конфиг.
+         * Загружает базовый конфиг из resources, затем мерджит с project-конфигом.
          */
         fun fromProjectDir(projectDir: Path): SymbolLibrary {
             val symbolsDir = projectDir.resolve("symbols")
             val configFile = symbolsDir.resolve("symbols.json")
             
-            val config = try {
+            // 1. Базовый конфиг из resources
+            val baseConfig = loadDefaultConfig() ?: SymbolConfig()
+            
+            // 2. Project конфиг (если есть)
+            val projectConfig = try {
                 if (Files.exists(configFile)) {
                     val content = Files.readString(configFile)
                     json.decodeFromString(SymbolConfig.serializer(), content)
                 } else {
-                    // Fallback: загрузка дефолтного конфига из resources
-                    loadDefaultConfig() ?: SymbolConfig()
+                    null
                 }
             } catch (e: Exception) {
                 LoggerFactory.getLogger(SymbolLibrary::class.java)
-                    .warn("Failed to load symbol config from $configFile: ${e.message}, using empty config")
-                SymbolConfig()
+                    .warn("Failed to load project config: ${e.message}")
+                null
             }
             
+            // 3. Мердж: project overrides base
+            val config = projectConfig?.let { mergeConfigs(baseConfig, it) } ?: baseConfig
+            
             return SymbolLibrary(symbolsDir, config)
+        }
+        
+        /**
+         * Мерджит два конфига: project-конфиг переопределяет базовый.
+         */
+        private fun mergeConfigs(base: SymbolConfig, project: SymbolConfig): SymbolConfig {
+            val mergedSymbols = base.symbols.toMutableMap()
+            mergedSymbols.putAll(project.symbols)
+            
+            val mergedMappings = base.mappings.toMutableMap()
+            mergedMappings.putAll(project.mappings)
+            
+            return SymbolConfig(
+                symbols = mergedSymbols,
+                mappings = mergedMappings
+            )
         }
         
         /**

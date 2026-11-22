@@ -18,11 +18,14 @@
         "2": { "x": 80.0, "y": 25.0 }
       }
     }
+
   },
   "mappings": {
     "Resistor": "resistor",
     "resistor": "resistor",
     "Capacitor": "capacitor",
-    "capacitor": "capacitor"
+    "capacitor": "capacitor",
+    "Antenna": "antenna",
+    "antenna": "antenna"
   }
 }
