@@ -1,10 +1,11 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Резистор: 80×40, ножки на x = ±40 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="80" height="40" viewBox="-40 -20 80 40">
   <!-- Левая ножка -->
-  <line x1="-40" y1="0" x2="-30" y2="0" stroke="black" stroke-width="2"/>
+  <line x1="-40" y1="0" x2="-20" y2="0" stroke="black" stroke-width="2"/>
   <!-- Правая ножка -->
-  <line x1="30" y1="0" x2="40" y2="0" stroke="black" stroke-width="2"/>
-  <!-- Тело резистора (прямоугольник) -->
-  <rect x="-30" y="-12" width="60" height="24" fill="none" stroke="black" stroke-width="2"/>
+  <line x1="20" y1="0" x2="40" y2="0" stroke="black" stroke-width="2"/>
+  <!-- Прямоугольник из 4 линий (палочек) -->
+  <line x1="-20" y1="-10" x2="20" y2="-10" stroke="black" stroke-width="2"/>
+  <line x1="20" y1="-10" x2="20" y2="10" stroke="black" stroke-width="2"/>
+  <line x1="20" y1="10" x2="-20" y2="10" stroke="black" stroke-width="2"/>
+  <line x1="-20" y1="10" x2="-20" y2="-10" stroke="black" stroke-width="2"/>
 </svg>

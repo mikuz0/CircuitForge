@@ -17,9 +17,8 @@ dependencies {
     implementation("org.slf4j:slf4j-simple:2.0.16")
 
     // ELK Java — автоматическая раскладка схем
-    // org.eclipse.elk.properties не существует в Maven Central
-    implementation("org.eclipse.elk:org.eclipse.elk.core:0.9.1")
-    implementation("org.eclipse.elk:org.eclipse.elk.alg.layered:0.9.1")
+    implementation("org.eclipse.elk:org.eclipse.elk.core:0.12.1")
+    implementation("org.eclipse.elk:org.eclipse.elk.alg.layered:0.12.1")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -27,18 +26,21 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+    compilerOptions {
+        freeCompilerArgs.add("-opt-in=kotlinx.serialization.ExperimentalSerializationApi")
     }
 }
 
 javafx {
-    version = "17.0.10"
+    version = "21.0.9"
     modules = listOf(
         "javafx.controls",
         "javafx.fxml",

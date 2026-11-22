@@ -1,18 +1,14 @@
 package ru.circuitforge.ui.schematic.symbols
 
 import org.slf4j.LoggerFactory
-import java.io.InputStream
-import java.nio.charset.StandardCharsets
+import javafx.scene.Group
 import javafx.scene.Node
 import javafx.scene.layout.Pane
 import javafx.scene.shape.*
-import kotlin.math.PI
-import kotlin.math.sin
-import kotlin.math.cos
 
 /**
  * Парсер SVG-файлов в JavaFX Node.
- * Поддерживает: rect, line, path, circle, group.
+ * Поддерживает: rect, line, path, circle, ellipse.
  */
 class SvgParser {
     private val logger = LoggerFactory.getLogger(SvgParser::class.java)
@@ -21,20 +17,28 @@ class SvgParser {
      * Парсит SVG-строку в JavaFX Pane с дочерними узлами.
      */
     fun parse(svgString: String): Pane {
-        val root = Pane()
-        
+        // Возвращаем Pane (для совместимости с SymbolRegistry),
+        // но внутри используем Group, чтобы JavaFX не сжимал фигуры
+        val root = Pane().apply {
+            isManaged = false
+            isPickOnBounds = false
+        }
+
+        val group = Group()
+
         try {
             val elements = parseSvgElements(svgString)
             elements.forEach { element ->
                 val node = parseElement(element)
                 if (node != null) {
-                    root.children.add(node)
+                    group.children.add(node)
                 }
             }
         } catch (e: Exception) {
             logger.error("Failed to parse SVG: ${e.message}", e)
         }
-        
+
+        root.children.add(group)
         return root
     }
 
@@ -60,7 +64,7 @@ class SvgParser {
         val y = element["y"]?.toDoubleOrNull() ?: 0.0
         val width = element["width"]?.toDoubleOrNull() ?: 0.0
         val height = element["height"]?.toDoubleOrNull() ?: 0.0
-        
+
         return Rectangle(x, y, width, height).apply {
             fill = parseColor(element["fill"])
             stroke = parseColor(element["stroke"])
@@ -76,7 +80,7 @@ class SvgParser {
         val y1 = element["y1"]?.toDoubleOrNull() ?: 0.0
         val x2 = element["x2"]?.toDoubleOrNull() ?: 0.0
         val y2 = element["y2"]?.toDoubleOrNull() ?: 0.0
-        
+
         return Line(x1, y1, x2, y2).apply {
             stroke = parseColor(element["stroke"])
             strokeWidth = element["stroke-width"]?.toDoubleOrNull() ?: 1.0
@@ -89,7 +93,7 @@ class SvgParser {
     private fun parsePath(element: Map<String, String>): Path {
         val d = element["d"] ?: ""
         val path = Path()
-        
+
         try {
             val commands = parsePathCommands(d)
             if (commands.isNotEmpty()) {
@@ -101,12 +105,12 @@ class SvgParser {
         } catch (e: Exception) {
             logger.warn("Failed to parse path: $d", e)
         }
-        
+
         path.stroke = parseColor(element["stroke"])
         path.fill = parseColor(element["fill"])
         path.strokeWidth = element["stroke-width"]?.toDoubleOrNull() ?: 1.0
         path.strokeLineJoin = StrokeLineJoin.ROUND
-        
+
         return path
     }
 
@@ -116,60 +120,46 @@ class SvgParser {
     private fun parsePathCommands(d: String): List<PathElement> {
         val elements = mutableListOf<PathElement>()
         val tokens = d.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-        
-        var currentX = 0.0
-        var currentY = 0.0
-        
+
         var i = 0
         while (i < tokens.size) {
             val token = tokens[i]
-            
+
             when {
-                token.uppercase() == "M" || token.uppercase() == "M" -> {
-                    // MoveTo
-                    val x = tokens[i + 1].toDoubleOrNull() ?: 0.0
-                    val y = tokens[i + 2].toDoubleOrNull() ?: 0.0
+                token.uppercase() == "M" -> {
+                    val x = tokens.getOrNull(i + 1)?.toDoubleOrNull() ?: 0.0
+                    val y = tokens.getOrNull(i + 2)?.toDoubleOrNull() ?: 0.0
                     elements.add(MoveTo(x, y))
-                    currentX = x
-                    currentY = y
                     i += 3
                 }
                 token.uppercase() == "L" -> {
-                    // LineTo
-                    val x = tokens[i + 1].toDoubleOrNull() ?: 0.0
-                    val y = tokens[i + 2].toDoubleOrNull() ?: 0.0
+                    val x = tokens.getOrNull(i + 1)?.toDoubleOrNull() ?: 0.0
+                    val y = tokens.getOrNull(i + 2)?.toDoubleOrNull() ?: 0.0
                     elements.add(LineTo(x, y))
-                    currentX = x
-                    currentY = y
                     i += 3
                 }
                 token.uppercase() == "A" -> {
-                    // Arc
-                    val rx = tokens[i + 1].toDoubleOrNull() ?: 0.0
-                    val ry = tokens[i + 2].toDoubleOrNull() ?: 0.0
-                    val xAxisRotation = tokens[i + 3].toDoubleOrNull() ?: 0.0
-                    val largeArc = tokens[i + 4].toIntOrNull() ?: 0
-                    val sweep = tokens[i + 5].toIntOrNull() ?: 0
-                    val x = tokens[i + 6].toDoubleOrNull() ?: 0.0
-                    val y = tokens[i + 7].toDoubleOrNull() ?: 0.0
-                    
+                    val rx = tokens.getOrNull(i + 1)?.toDoubleOrNull() ?: 0.0
+                    val ry = tokens.getOrNull(i + 2)?.toDoubleOrNull() ?: 0.0
+                    val xAxisRotation = tokens.getOrNull(i + 3)?.toDoubleOrNull() ?: 0.0
+                    val largeArc = tokens.getOrNull(i + 4)?.toIntOrNull() ?: 0
+                    val sweep = tokens.getOrNull(i + 5)?.toIntOrNull() ?: 0
+                    val x = tokens.getOrNull(i + 6)?.toDoubleOrNull() ?: 0.0
+                    val y = tokens.getOrNull(i + 7)?.toDoubleOrNull() ?: 0.0
+
                     elements.add(ArcTo(rx, ry, xAxisRotation, x, y, sweep == 1, largeArc == 1))
-                    currentX = x
-                    currentY = y
                     i += 8
                 }
                 token.uppercase() == "Z" -> {
-                    // ClosePath
                     elements.add(ClosePath())
                     i += 1
                 }
                 else -> {
-                    // Пытаемся распарсить как число (продолжение команды)
                     i++
                 }
             }
         }
-        
+
         return elements
     }
 
@@ -180,7 +170,7 @@ class SvgParser {
         val cx = element["cx"]?.toDoubleOrNull() ?: 0.0
         val cy = element["cy"]?.toDoubleOrNull() ?: 0.0
         val r = element["r"]?.toDoubleOrNull() ?: 0.0
-        
+
         return Circle(cx, cy, r).apply {
             fill = parseColor(element["fill"])
             stroke = parseColor(element["stroke"])
@@ -196,7 +186,7 @@ class SvgParser {
         val cy = element["cy"]?.toDoubleOrNull() ?: 0.0
         val rx = element["rx"]?.toDoubleOrNull() ?: 0.0
         val ry = element["ry"]?.toDoubleOrNull() ?: 0.0
-        
+
         return Ellipse(cx, cy, rx, ry).apply {
             fill = parseColor(element["fill"])
             stroke = parseColor(element["stroke"])
@@ -222,11 +212,10 @@ class SvgParser {
      */
     private fun parseSvgElements(svgString: String): List<MutableMap<String, String>> {
         val elements = mutableListOf<MutableMap<String, String>>()
-        
-        // Извлекаем содержимое между тегами
+
         val tagRegex = Regex("""<(\w+)([^>]+)?>""")
         val matches = tagRegex.findAll(svgString)
-        
+
         matches.forEach { match ->
             val tag = match.groupValues[1]
             val attributesStr = match.groupValues[2]
@@ -234,7 +223,7 @@ class SvgParser {
             attributes["tag"] = tag
             elements.add(attributes)
         }
-        
+
         return elements
     }
 
@@ -245,11 +234,11 @@ class SvgParser {
         val attributes = mutableMapOf<String, String>()
         val attrRegex = Regex("""(\w+)="([^"]*)"""")
         val matches = attrRegex.findAll(attributesStr)
-        
+
         matches.forEach { match ->
             attributes[match.groupValues[1]] = match.groupValues[2]
         }
-        
+
         return attributes
     }
 }

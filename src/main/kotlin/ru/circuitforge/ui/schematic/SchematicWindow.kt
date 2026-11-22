@@ -45,14 +45,16 @@ class SchematicWindow : ProjectAware {
     private val bomRows = FXCollections.observableArrayList<BomRow>()
     private val nets = FXCollections.observableArrayList<Net>()
     private val schematicNodes = FXCollections.observableArrayList<SchematicNode>()
+    private val schematicWires = FXCollections.observableArrayList<WireConnection>()
 
     // Map для быстрого доступа
     private val nodesMap = mutableMapOf<String, SchematicNode>()
     private val bomRowsMap = mutableMapOf<String, BomRow>()
     private val componentsMap = mutableMapOf<String, Component>()
 
-    // UI контейнеры — 4 слоя
+    // UI контейнеры — 5 слоёв
     private val canvas = Canvas(5000.0, 5000.0)          // задний: сетка
+    private val wirePane = Pane()                        // слой для проводов из ELK (Polyline)
     private val linePane = Pane()                        // средний: кривые Безье
     private val portPane = Pane()                        // слой для кружочков портов
     private val componentPane = Pane()                   // передний: компоненты
@@ -100,14 +102,20 @@ class SchematicWindow : ProjectAware {
         linePane.isManaged = false
         linePane.isPickOnBounds = false
 
+        // Слой проводов из ELK
+        wirePane.prefWidth = 5000.0
+        wirePane.prefHeight = 5000.0
+        wirePane.isManaged = false
+        wirePane.isPickOnBounds = false
+
         // Слой кружочков
         portPane.prefWidth = 5000.0
         portPane.prefHeight = 5000.0
         portPane.isManaged = false
         portPane.isPickOnBounds = false
 
-        // Основной Pane — 4 слоя: сетка (canvas), линии, порты, компоненты
-        mainPane.children.setAll(canvas, linePane, portPane, componentPane)
+        // Основной Pane — 5 слоёв: сетка (canvas), провода ELK (wirePane), линии (linePane), порты, компоненты
+        mainPane.children.setAll(canvas, wirePane, linePane, portPane, componentPane)
         mainPane.prefWidth = 5000.0
         mainPane.prefHeight = 5000.0
 
@@ -147,6 +155,7 @@ class SchematicWindow : ProjectAware {
         bomRows.forEach { row -> bomRowsMap[row.bomnetId] = row }
         drawGridOnCanvas()
         drawComponents()
+        drawAllWires()
         drawAllPorts() // <-- Рисуем кружочки один раз
     }
 
@@ -315,13 +324,52 @@ class SchematicWindow : ProjectAware {
     }
 
     /**
+     * Рисует все провода из ELK (WireConnection с bendPoints) на wirePane.
+     */
+    private fun drawAllWires() {
+        wirePane.children.clear()
+
+        if (schematicWires.isEmpty()) return
+
+        schematicWires.forEach { wire ->
+            val netColor = netColor(wire.netName)
+            val startCoord = getPinCoordinates(wire.refDesFrom, wire.pinFrom)
+            val endCoord = getPinCoordinates(wire.refDesTo, wire.pinTo)
+
+            if (startCoord == null || endCoord == null) return@forEach
+
+            val coords = mutableListOf<Double>().apply {
+                add(startCoord.first)
+                add(startCoord.second)
+                wire.bendPoints.forEach { bp ->
+                    add(bp.x)
+                    add(bp.y)
+                }
+                add(endCoord.first)
+                add(endCoord.second)
+            }
+
+            if (coords.size >= 4) {
+                val polyline = javafx.scene.shape.Polyline().apply {
+                    this.points.setAll(coords)
+                    stroke = netColor
+                    fill = null
+                    strokeWidth = 2.0
+                    opacity = 0.7
+                }
+                wirePane.children.add(polyline)
+            }
+        }
+    }
+
+    /**
      * Получает координаты пина по refDes и pinNumber.
      */
     private fun getPinCoordinates(refDes: String, pinNumber: String): Pair<Double, Double>? {
         val key = portKey(refDes, pinNumber)
         val circle = portCircles[key] ?: return null
-        // Круги позиционированы относительно portPane, используем getLayoutX/Y напрямую
-        return Pair(circle.layoutX, circle.layoutY)
+        // Circle создаётся с координатами в centerX/centerY
+        return Pair(circle.centerX, circle.centerY)
     }
 
     /**
@@ -396,9 +444,15 @@ class SchematicWindow : ProjectAware {
 
     private fun getConnectedPorts(refDes: String, comp: Component): Set<String> {
         val connected = mutableSetOf<String>()
+        // Получаем список допустимых номеров пинов для этого компонента
+        val validPinNumbers = comp.ports.map { it.pinNumber }.toSet()
+        
         nets.forEach { net ->
             net.connections.filter { it.refDes == refDes }.forEach { conn ->
-                connected.add(portKey(refDes, conn.pinNumber))
+                // Добавляем только если пин существует в компоненте
+                if (conn.pinNumber in validPinNumbers) {
+                    connected.add(portKey(refDes, conn.pinNumber))
+                }
             }
         }
         return connected
@@ -466,6 +520,7 @@ class SchematicWindow : ProjectAware {
                     // Перерисовываем кружочки и линии
                     drawAllPorts()
                     drawPortConnections(activePorts.toSet())
+                    drawAllWires()
                 }
                 event.consume()
             }
@@ -476,6 +531,7 @@ class SchematicWindow : ProjectAware {
                 activePorts.removeAll(connectedPorts)
                 drawAllPorts()
                 drawPortConnections(activePorts.toSet())
+                drawAllWires()
                 dragNode = null
                 saveSchematicAsync()
                 event.consume()
@@ -510,7 +566,7 @@ class SchematicWindow : ProjectAware {
         val task = object : Task<Unit>() {
             override fun call() {
                 projectPaths?.let { paths ->
-                    val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList())
+                    val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList(), wires = schematicWires.toList())
                     SchematicRepository.save(paths, doc)
                 }
             }
@@ -543,7 +599,8 @@ class SchematicWindow : ProjectAware {
                 projectPaths?.let { paths ->
                     val doc = SchematicDocument(
                         schemaVersion = 1,
-                        nodes = schematicNodes.toList()
+                        nodes = schematicNodes.toList(),
+                        wires = schematicWires.toList()
                     )
                     SchematicRepository.save(paths, doc)
                 }
@@ -590,6 +647,7 @@ class SchematicWindow : ProjectAware {
 
                     javafx.application.Platform.runLater {
                         schematicNodes.setAll(document.nodes)
+                        schematicWires.setAll(document.wires)
                         drawSchematic()
                         statusLabel.text = I18n.tr("schematic.status.layout_done")?.replace("{0}", document.nodes.size.toString())
                             ?: "Раскладка завершена: ${document.nodes.size} компонентов"
@@ -699,7 +757,7 @@ class SchematicWindow : ProjectAware {
                 }
 
                 // Сохраняем
-                val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList())
+                val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList(), wires = schematicWires.toList())
                 SchematicRepository.save(paths, doc)
             }
 
@@ -889,15 +947,18 @@ class SchematicWindow : ProjectAware {
                         val document = engine.layout(rows, netDoc.nets, componentsMap)
                         SchematicRepository.save(paths, document)
                         schematicNodes.setAll(document.nodes)
+                        schematicWires.setAll(document.wires)
                         logger.info("ELK auto-layout completed: ${document.nodes.size} components")
                     } catch (e: Exception) {
                         logger.warn("ELK auto-layout failed, falling back to grid layout: ${e.message}", e)
                         val nodes = generateGridCoordinates(rows)
                         SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
                         schematicNodes.setAll(nodes)
+                        schematicWires.clear()
                     }
                 } else {
                     schematicNodes.setAll(existingDoc.nodes)
+                    schematicWires.setAll(existingDoc.wires)
                 }
             }
 

@@ -17,7 +17,7 @@ object I18n {
 
     fun load(locale: LocaleType) {
         currentLocale = locale
-        val bundleLocale = if (locale == LocaleType.RU) Locale("ru") else Locale.ROOT
+        val bundleLocale = if (locale == LocaleType.RU) Locale.forLanguageTag("ru") else Locale.ROOT
         bundle = ResourceBundle.getBundle("messages", bundleLocale)
     }
 

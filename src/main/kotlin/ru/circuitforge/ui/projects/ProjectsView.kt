@@ -28,6 +28,14 @@ class ProjectsView {
     // Список проектов
     private val listView = ListView<ProjectInfo>().apply {
         prefHeight = 200.0
+        setCellFactory { _ ->
+            object : ListCell<ProjectInfo>() {
+                override fun updateItem(item: ProjectInfo?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    text = if (empty || item == null) null else item.name
+                }
+            }
+        }
     }
 
     // Кнопки модулей

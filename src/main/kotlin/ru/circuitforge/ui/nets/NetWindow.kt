@@ -173,19 +173,28 @@ class NetWindow : ProjectAware {
         labelCol.setCellFactory { _ ->
             object : TableCell<Net, Boolean>() {
                 private val checkBox = CheckBox()
+                private val listener = javafx.beans.value.ChangeListener<Boolean> { _, _, newVal ->
+                    val net = tableRow.item
+                    if (net != null) {
+                        net.labelMode = newVal
+                        markDirty()
+                        saveNetsAsync()
+                    }
+                }
+                
                 override fun updateItem(item: Boolean?, empty: Boolean) {
                     super.updateItem(item, empty)
                     if (empty || item == null) {
+                        checkBox.isSelected = false
                         graphic = null
                     } else {
                         val net = tableRow.item
                         if (net != null) {
+                            // Удаляем слушатель перед обновлением, чтобы не накапливались
+                            checkBox.selectedProperty().removeListener(listener)
                             checkBox.isSelected = item
-                            checkBox.selectedProperty().addListener { _, _, newVal ->
-                                net.labelMode = newVal
-                                markDirty()
-                                saveNetsAsync()
-                            }
+                            // Привязываем слушатель к текущему net
+                            checkBox.selectedProperty().addListener(listener)
                             graphic = checkBox
                         } else {
                             graphic = null
