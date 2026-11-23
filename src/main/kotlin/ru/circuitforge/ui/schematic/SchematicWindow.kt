@@ -242,6 +242,32 @@ class SchematicWindow : ProjectAware {
                     }
                     portPane.children.add(circle)
                     portCircles[key] = circle
+
+                    // Невидимый хитбокс для клика (радиус 10px)
+                    val hitCircle = Circle(coords.first, coords.second, 10.0).apply {
+                        fill = Color.TRANSPARENT
+                        stroke = null
+                        cursor = Cursor.HAND
+
+                        setOnMousePressed { event ->
+                            if (activePorts.contains(key)) {
+                                activePorts.remove(key)
+                            } else {
+                                activePorts.add(key)
+                            }
+                            drawAllPorts()
+                            drawPortConnections(activePorts.toSet())
+                            event.consume()
+                        }
+                        setOnMouseEntered {
+                            if (!activePorts.contains(key)) circle.fill = Color.web("#64B5F6")
+                        }
+                        setOnMouseExited {
+                            if (!activePorts.contains(key)) circle.fill = Color.web("#2196F3")
+                        }
+                    }
+                    // Хитбокс добавляем ПОД видимым кружком
+                    portPane.children.addAll(0, listOf(hitCircle))
                     
                     // Рисуем номер пина рядом с кружком
                     val pinLabel = Label(port.pinNumber).apply {
@@ -495,19 +521,35 @@ class SchematicWindow : ProjectAware {
             group.layoutY = node.y
             group.rotate = node.rotation
 
-            // Обработчики мыши на группе компонента
-            group.setOnMousePressed { event ->
-                // Проверяем, не клик ли был на кружочке
-                val target = event.target
-                val isPortCircle = portCircles.values.any { it == target }
+            // Делаем Canvas mouse-transparent, чтобы клики проходили сквозь рамку к портам
+            val firstChild = group.children.firstOrNull() ?: return@forEach
+            firstChild.isMouseTransparent = true
 
-                if (!isPortCircle) {
-                    // Активируем все порты компонента
-                    val connectedPorts = getConnectedPorts(row.refDes, comp)
-                    activePorts.addAll(connectedPorts)
-                    drawAllPorts()
-                    drawPortConnections(activePorts.toSet())
-                }
+            // Вычисляем размеры компонента из первого child'а
+            val (compW, compH) = when (firstChild) {
+                is javafx.scene.layout.Pane -> firstChild.prefWidth to firstChild.prefHeight
+                is Canvas -> firstChild.boundsInLocal.width to firstChild.boundsInLocal.height
+                else -> 100.0 to 80.0
+            }
+
+            // Невидимый хитбокс с inset 10px от краёв
+            val inset = 10.0
+            val hitRect = javafx.scene.shape.Rectangle(
+                inset / 2, inset / 2,
+                compW - inset, compH - inset
+            ).apply {
+                fill = Color.TRANSPARENT
+                cursor = Cursor.HAND
+            }
+            group.children.add(hitRect)
+
+            // Обработчики мыши на хитбоксе
+            hitRect.setOnMousePressed { event ->
+                // Активируем все порты компонента
+                val connectedPorts = getConnectedPorts(row.refDes, comp)
+                activePorts.addAll(connectedPorts)
+                drawAllPorts()
+                drawPortConnections(activePorts.toSet())
                 // Начинаем перетаскивание
                 dragNode = node
                 dragOffsetX = event.sceneX - group.layoutX
@@ -516,7 +558,7 @@ class SchematicWindow : ProjectAware {
                 event.consume()
             }
 
-            group.setOnMouseDragged { event ->
+            hitRect.setOnMouseDragged { event ->
                 val currentNode = dragNode
                 if (currentNode != null) {
                     val rawX = event.sceneX - dragOffsetX
@@ -542,7 +584,7 @@ class SchematicWindow : ProjectAware {
                 event.consume()
             }
 
-            group.setOnMouseReleased { event ->
+            hitRect.setOnMouseReleased { event ->
                 // Деактивируем порты этого компонента
                 val connectedPorts = getConnectedPorts(row.refDes, comp)
                 activePorts.removeAll(connectedPorts)
