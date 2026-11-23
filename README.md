@@ -1,0 +1,173 @@
+# CircuitForge
+
+**CircuitForge** — инструмент для проектирования электронных схем с визуальным редактором, управлением компонентами, трассировкой цепей и генерацией спецификаций (BOM).
+
+## Возможности
+
+- **Управление компонентами** — создание и редактирование компонентов с портами и свойствами
+- **Редактор цепей (Nets)** — определение соединений между контактами компонентов
+- **Генерация BOM** — автоматическое создание спецификаций компонентов
+- **Drag & Drop** — перетаскивание компонентов на схеме
+- **Контекстные линии связи** — отображение соединений при выборе портов
+- **Авто-раскладка** — автоматическое размещение компонентов по сетке
+- **Синхронизация** — обновление схемы при изменении BOM
+- **Сохранение/загрузка** — экспорт и импорт проектов в формате `.cfproj`
+- **i18n** — поддержка русского и английского языков
+- **Визуальный просмотр схем** — размещение компонентов на холсте с поддержкой SVG-символов
+- 
+## Технологии
+
+- **Kotlin 2.0.21** + **JavaFX 21**
+- **JSVG** — рендеринг SVG-символов компонентов
+- **Kotlinx Serialization** — работа с JSON
+- **Gradle 8.5** — сборка проекта
+- **Java 21** — целевая версия JVM
+
+## Структура проекта
+
+```
+CircuitForge/
+├── src/main/kotlin/ru/circuitforge/
+│   ├── app/                    # Главное приложение
+│   ├── i18n/                   # Локализация
+│   ├── project/                # Модель проекта (BOM, Nets, Components, Schematic)
+│   ├── resources/              # Ресурсы (SVG-символы, конфиги)
+│   └── ui/
+│       ├── editor/             # BOM-редактор
+│       ├── nets/               # Редактор цепей
+│       ├── components/         # Менеджер компонентов
+│       ├── schematic/          # Редактор схем
+│       └── common/             # Общие UI-утилиты
+├── scripts/                    # Скрипты сборки (deb)
+└── build.gradle.kts
+```
+
+## Формат проекта
+
+Проект хранится в директории с файлом `project.cfproj`:
+
+```
+project/
+├── project.cfproj              # Метаданные проекта
+├── components/                 # .cfcomp файлы компонентов
+├── nets/                       # .nets.json файлы цепей
+├── symbols/                    # SVG-символы и symbols.json
+├── exports/                    # Экспорт BOM
+└── datasheet/                  # Документация
+```
+
+## Сборка
+
+### Требования
+
+- **Java 21+**
+- **Gradle 8.5+**
+
+### Команды
+
+```bash
+# Сборка проекта
+./gradlew build
+
+# Запуск основного приложения
+./gradlew run
+
+# Запуск BOM-редактора
+./gradlew runBom
+
+# Запуск редактора цепей
+./gradlew runNet
+
+# Запуск менеджера компонентов
+./gradlew runComponents
+
+# Создание дистрибутива
+./gradlew installDist
+
+# Сборка deb-пакета
+./scripts/build-deb.sh
+```
+
+## Запуск
+
+После сборки:
+
+```bash
+# Из build/distribution
+./build/install/CircuitForge/bin/CircuitForge
+
+# Или из Gradle
+./gradlew run
+```
+
+## Форматы файлов
+
+### BOM (bom.json)
+```json
+{
+  "bomRows": [
+    {
+      "bomnetId": "uuid",
+      "refDes": "R1",
+      "componentId": "uuid",
+      "comment": "10kΩ",
+      "quantity": 1
+    }
+  ]
+}
+```
+
+### Nets (nets.json)
+```json
+{
+  "nets": [
+    {
+      "name": "VCC",
+      "connections": [
+        {"refDes": "R1", "pinNumber": "1"},
+        {"refDes": "C1", "pinNumber": "1"}
+      ]
+    }
+  ]
+}
+```
+
+### Component (.cfcomp)
+```json
+{
+  "schemaVersion": 1,
+  "id": "uuid",
+  "name": "Resistor",
+  "ports": [
+    {"number": 1, "pinNumber": "1", "name": "Pin1"},
+    {"number": 2, "pinNumber": "2", "name": "Pin2"}
+  ]
+}
+```
+
+## SVG-символы
+
+Компоненты используют SVG-символы, определённые в `symbols/symbols.json`:
+
+```json
+{
+  "symbols": {
+    "resistor": {
+      "file": "resistor.svg",
+      "width": 80.0,
+      "height": 40.0,
+      "ports": {
+        "1": {"x": 0.0, "y": 20.0},
+        "2": {"x": 80.0, "y": 20.0}
+      }
+    }
+  },
+  "mappings": {
+    "Resistor": "resistor"
+  }
+}
+```
+
+## Лицензия
+
+MIT
