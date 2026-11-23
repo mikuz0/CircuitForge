@@ -301,6 +301,9 @@ class SchematicWindow : ProjectAware {
             val (activeRefDes, activePin) = activeKey.split(":", limit = 2)
 
             nets.forEach { net ->
+                // Skip drawing Bezier curves for nets with labelMode
+                if (net.labelMode) return@forEach
+
                 val hasActivePort = net.connections.any { conn ->
                     conn.refDes == activeRefDes && conn.pinNumber == activePin
                 }
@@ -439,23 +442,29 @@ class SchematicWindow : ProjectAware {
 
                 val direction = getPinDirection(comp, conn.pinNumber, node)
 
-                val offset = 12.0
+                // Центр компонента
+                val symSize = SymbolRegistry.getInstance().getSymbolSize(comp.name)
+                val centerX = node.x + symSize.first / 2.0
+                val centerY = node.y + symSize.second / 2.0
+
+                // Вектор от центра к пину
+                val dx = pinCoords.first - centerX
+                val dy = pinCoords.second - centerY
+                val dist = kotlin.math.hypot(dx, dy)
+
+                // Смещение 20px от центра по направлению к пину
+                val offset = 20.0
+                val labelX = if (dist > 0) pinCoords.first + (dx / dist) * offset else pinCoords.first + 20.0
+                val labelY = if (dist > 0) pinCoords.second + (dy / dist) * offset else pinCoords.second + 10.0
+
                 val fontSize = 10.0
                 val netColorObj = netColor(net.name)
                 val colorCss = String.format("#%02X%02X%02X", (netColorObj.red * 255).toInt(), (netColorObj.green * 255).toInt(), (netColorObj.blue * 255).toInt())
 
                 val label = Label(net.name).apply {
                     style = "-fx-font-size: $fontSize; -fx-font-family: SansSerif; -fx-text-fill: $colorCss;"
-                    layoutX = when (direction) {
-                        PinDirection.LEFT -> pinCoords.first - offset - 40
-                        PinDirection.RIGHT -> pinCoords.first + offset
-                        PinDirection.TOP, PinDirection.BOTTOM -> pinCoords.first - 30
-                    }
-                    layoutY = when (direction) {
-                        PinDirection.LEFT, PinDirection.RIGHT -> pinCoords.second - 5
-                        PinDirection.TOP -> pinCoords.second - offset - 10
-                        PinDirection.BOTTOM -> pinCoords.second + offset
-                    }
+                    layoutX = labelX - 20.0
+                    layoutY = labelY + 4.0
                 }
                 linePane.children.add(label)
                 drawnPins.add(portKey(conn.refDes, conn.pinNumber))

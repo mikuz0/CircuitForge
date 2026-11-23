@@ -1,31 +1,21 @@
-# Fix: Expand click area for port circles and component hitbox
+# Изменение логики отрисовки цепей с labelMode
 
-## Problem 1: Port circles
-Port circles (`Circle`) in `SchematicWindow.drawAllPorts()` have `pickOnBounds = false` by default. Mouse events fire only on the stroke (outline), not the filled area.
+## Выполнено
 
-## Problem 2: Component hitbox too small
-In `drawComponents()`, component dimensions are read from Canvas using `.width/.height` which are 0 before layout. For fallback components with many ports, the calculated hitbox is tiny instead of the correct size with port spacing.
-
-## Solution
-
-### Fix 1: Port hitbox (already done)
-Add invisible hitbox circle with 10px radius under each port circle.
-
-### Fix 2: Component dimensions
-**File:** `src/main/kotlin/ru/circuitforge/ui/schematic/SchematicWindow.kt`
-
-**Location:** `drawComponents()` method, lines ~528-532
-
-**Change:** Replace `.width/.height` with `.prefWidth/.prefHeight` for Canvas:
+### 1. Пропуск кривых для labelMode цепей
+**Файл:** `SchematicWindow.kt`, строка 304, метод `drawPortConnections()`
 ```kotlin
-// Before:
-is Canvas -> firstChild.width to firstChild.height
-// After:
-is Canvas -> firstChild.prefWidth to firstChild.prefHeight
+if (net.labelMode) return@forEach
 ```
 
-## Verification
-- Build: `./gradlew build`
-- Run app, open schematic with large fallback components (many ports)
-- Click area for component should now correctly cover the full component bounds
-- Port circles should be clickable anywhere within their area
+### 2. Смещение меток на 20px от центра компонента
+**Файл:** `SchematicWindow.kt`, строки 444-467, метод `drawNetLabelsForActivePorts()`
+- Вычисляется центр компонента: `centerX = node.x + symSize.first / 2.0`
+- Вектор от центра к пину: `dx, dy`
+- Смещение 20px по направлению к пину: `labelX = pinCoords.first + (dx / dist) * 20.0`
+
+## Верификация
+- `./gradlew build` — BUILD SUCCESSFUL
+- Открыть схему с цепью `labelMode: true`
+- Кривая Безье не рисуется, вместо неё — текстовые метки с именем цепи
+- Метки смещены на 20px от центра компонента по направлению к пину
