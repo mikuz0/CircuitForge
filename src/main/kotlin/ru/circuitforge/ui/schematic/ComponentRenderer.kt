@@ -38,26 +38,35 @@ object ComponentRenderer {
         val registry = SymbolRegistry.getInstance()
         val originalSymbolPane = registry.getSymbol(symbolType) as Pane
         
-        // Получаем SVGDocument и оригинальную строку
+        // Проверяем, есть ли SVG-контент
         val svgData = svgParser.getSvgData(originalSymbolPane)
+        val hasSvgContent = svgData != null && originalSymbolPane.children.isNotEmpty()
         
-        // Клонируем SVGDocument или создаём fallback
-        val canvas = if (svgData != null) {
+        // Вычисляем размеры
+        var (symW, symH) = registry.getSymbolSize(comp.name)
+        
+        // Для fallback-компонентов рассчитываем размеры с контролем шага портов
+        if (!hasSvgContent) {
+            val portCount = comp.ports.size
+            if (portCount > 2) {
+                val minPinSpacing = 4 * 12.5
+                val perSide = (portCount + 3) / 4
+                symW = maxOf(perSide * minPinSpacing, 100.0)
+                symH = maxOf(perSide * minPinSpacing, 80.0)
+            }
+        }
+        
+        val canvas = if (hasSvgContent) {
             try {
                 val clonedDoc = svgParser.cloneSvgDocument(svgData.first, svgData.second)
-                val canvas = svgParser.createFxSvgCanvas(clonedDoc)
-                
-                // Устанавливаем размеры
-                val symbolWidth = originalSymbolPane.prefWidth.takeIf { it > 0.0 } ?: 100.0
-                val symbolHeight = originalSymbolPane.prefHeight.takeIf { it > 0.0 } ?: 80.0
-                canvas.prefWidth = symbolWidth
-                canvas.prefHeight = symbolHeight
-                canvas.minWidth = symbolWidth
-                canvas.minHeight = symbolHeight
-                canvas.maxWidth = symbolWidth
-                canvas.maxHeight = symbolHeight
-                
-                canvas
+                val fxCanvas = svgParser.createFxSvgCanvas(clonedDoc)
+                fxCanvas.prefWidth = symW
+                fxCanvas.prefHeight = symH
+                fxCanvas.minWidth = symW
+                fxCanvas.minHeight = symH
+                fxCanvas.maxWidth = symW
+                fxCanvas.maxHeight = symH
+                fxCanvas
             } catch (e: Exception) {
                 logger.warn("Failed to clone SVG, using fallback: ${e.message}")
                 svgParser.createEmptyCanvas()
@@ -67,39 +76,22 @@ object ComponentRenderer {
         }
         
         group.children.add(canvas)
-
+        
         // Подписи RefDes и Comment
         val refDesLabel = Label(row.refDes).apply {
             style = "-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: black;"
             layoutX = -20.0
-            layoutY = -35.0
+            layoutY = -symH / 2.0 - 20.0
         }
         group.children.add(refDesLabel)
-
+        
         val commentLabel = Label(row.comment).apply {
             style = "-fx-font-size: 11px; -fx-text-fill: gray;"
             layoutX = -20.0
-            layoutY = -10.0
+            layoutY = -symH / 2.0 - 5.0
         }
         group.children.add(commentLabel)
-
-        // Номера пинов — по реальным координатам из конфига
-        val (symW, symH) = registry.getSymbolSize(comp.name)
-        comp.ports.forEach { port ->
-            val portPos = registry.getPortPosition(comp.name, port.pinNumber) ?: return@forEach
-            val (px, py) = portPos
-            // px/py — координаты SVG относительно top-left -> координаты внутри canvas
-            val canvasX = px
-            val canvasY = py
-            val pinLabel = Label(port.pinNumber).apply {
-                style = "-fx-font-size: 9px; -fx-text-fill: black;"
-                layoutX = if (px < symW / 2) canvasX - 12.0 else canvasX + 4.0
-                layoutY = canvasY - 4.0
-            }
-            group.children.add(pinLabel)
-        }
     }
-
     fun getPinNumberForIndex(comp: Component, index: Int): String {
         return if (index < comp.ports.size) comp.ports[index].pinNumber else "${index + 1}"
     }

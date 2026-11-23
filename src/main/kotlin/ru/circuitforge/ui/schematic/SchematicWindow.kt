@@ -213,7 +213,7 @@ class SchematicWindow : ProjectAware {
 
             comp.ports.forEach { port ->
                 val key = portKey(row.refDes, port.pinNumber)
-                if (!connectedPorts.contains(key)) return@forEach
+                // Рисуем все порты (не только connected) для fallback-компонентов
 
                 val coords = PortCalculator.getPortCoordinatesWithRotation(nodesMap, componentsMap, row, port.pinNumber)
                 if (coords != null) {
@@ -242,6 +242,24 @@ class SchematicWindow : ProjectAware {
                     }
                     portPane.children.add(circle)
                     portCircles[key] = circle
+                    
+                    // Рисуем номер пина рядом с кружком
+                    val pinLabel = Label(port.pinNumber).apply {
+                        style = "-fx-font-size: 9px; -fx-text-fill: black;"
+                        layoutX = coords.first - 8.0
+                        layoutY = coords.second - 10.0
+                    }
+                    portPane.children.add(pinLabel)
+                    
+                    // Рисуем имя пина если есть
+                    if (port.name.isNotBlank()) {
+                        val nameLabel = Label(port.name).apply {
+                            style = "-fx-font-size: 8px; -fx-text-fill: gray;"
+                            layoutX = coords.first - 12.0
+                            layoutY = coords.second + 4.0
+                        }
+                        portPane.children.add(nameLabel)
+                    }
                 }
             }
         }
