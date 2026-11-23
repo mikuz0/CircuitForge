@@ -72,7 +72,7 @@ object ComponentRenderer {
                 svgParser.createEmptyCanvas()
             }
         } else {
-            svgParser.createEmptyCanvas()
+            createFallbackCanvasWithRect(symW, symH)
         }
         
         group.children.add(canvas)
@@ -91,6 +91,23 @@ object ComponentRenderer {
             layoutY =  - 40.0
         }
         group.children.add(commentLabel)
+    }
+    /**
+     * Создаёт fallback canvas с прямоугольной рамкой.
+     */
+    private fun createFallbackCanvasWithRect(width: Double, height: Double): FXSVGCanvas {
+        val svgContent = """<svg xmlns="http://www.w3.org/2000/svg" width="$width" height="$height">
+            <rect x="0" y="0" width="$width" height="$height" fill="none" stroke="black" stroke-width="1.5"/>
+        </svg>"""
+        val doc = svgParser.loadSvgDocument(svgContent)
+        val canvas = svgParser.createFxSvgCanvas(doc)
+        canvas.prefWidth = width
+        canvas.prefHeight = height
+        canvas.minWidth = width
+        canvas.minHeight = height
+        canvas.maxWidth = width
+        canvas.maxHeight = height
+        return canvas
     }
     fun getPinNumberForIndex(comp: Component, index: Int): String {
         return if (index < comp.ports.size) comp.ports[index].pinNumber else "${index + 1}"
