@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Стандартный компонент (IC): 120×80, порты на x = ±60 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="-60 -40 120 80">
-  <!-- Левая ножка -->
-  <line x1="-60" y1="0" x2="-35" y2="0" stroke="black" stroke-width="2"/>
-  <!-- Правая ножка -->
-  <line x1="35" y1="0" x2="60" y2="0" stroke="black" stroke-width="2"/>
+
   <!-- Тело компонента (прямоугольник) -->
   <rect x="-35" y="-25" width="70" height="50" fill="none" stroke="black" stroke-width="2"/>
-  <!-- Полукруг сверху (индикатор пина 1) -->
-  <path d="M -10 -25 A 10 10 0 0 1 10 -25" fill="none" stroke="black" stroke-width="1.5"/>
+
 </svg>

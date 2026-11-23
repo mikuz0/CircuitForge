@@ -56,7 +56,7 @@ class SchematicExporter {
             }
             svg.appendLine("  <use href=\"#sym-$symbolType\" transform=\"$transform\"/>")
             svg.appendLine("  <text x=\"${node.x - 20}\" y=\"${node.y - 35}\" font-weight=\"bold\" font-size=\"12\" fill=\"black\">${row.refDes}</text>")
-            svg.appendLine("  <text x=\"${node.x - 20}\" y=\"${node.y + 25}\" font-size=\"11\" fill=\"gray\">${row.comment}</text>")
+            svg.appendLine("  <text x=\"${node.x - 20}\" y=\"${node.y - 10}\" font-size=\"11\" fill=\"gray\">${row.comment}</text>")
         }
         svg.appendLine("</g>")
 

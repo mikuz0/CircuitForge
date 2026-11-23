@@ -79,7 +79,7 @@ object ComponentRenderer {
         val commentLabel = Label(row.comment).apply {
             style = "-fx-font-size: 11px; -fx-text-fill: gray;"
             layoutX = -20.0
-            layoutY = 25.0
+            layoutY = -10.0
         }
         group.children.add(commentLabel)
 

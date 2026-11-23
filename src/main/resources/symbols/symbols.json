@@ -17,8 +17,27 @@
         "1": { "x": 0.0,  "y": 25.0 },
         "2": { "x": 80.0, "y": 25.0 }
       }
+    },
+    "antenna": {
+      "file": "antenna.svg",
+      "width": 60.0,
+      "height": 80.0,
+      "ports": {
+        "1": {
+          "x": 30.0,
+          "y": 78.0
+        }
+      }
+    },
+    "inductor": {
+      "file": "inductor.svg",
+      "width": 80.0,
+      "height": 40.0,
+      "ports": {
+        "1": { "x": 0.0,  "y": 20.0 },
+        "2": { "x": 80.0, "y": 20.0 }
+      }
     }
-
   },
   "mappings": {
     "Resistor": "resistor",
@@ -26,6 +45,8 @@
     "Capacitor": "capacitor",
     "capacitor": "capacitor",
     "Antenna": "antenna",
-    "antenna": "antenna"
+    "antenna": "antenna",
+    "Inductor": "inductor",
+    "inductor": "inductor"
   }
 }
