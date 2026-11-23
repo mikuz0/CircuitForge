@@ -53,10 +53,11 @@ class SchematicWindow : ProjectAware {
     private val bomRowsMap = mutableMapOf<String, BomRow>()
     private val componentsMap = mutableMapOf<String, Component>()
 
-    // UI контейнеры — 5 слоёв
+    // UI контейнеры — 6 слоёв
     private val canvas = Canvas(5000.0, 5000.0)          // задний: сетка
     private val wirePane = Pane()                        // слой для проводов из ELK (Polyline)
     private val linePane = Pane()                        // средний: кривые Безье
+    private val labelPane = Pane()                       // слой для текстовых меток labelMode
     private val portPane = Pane()                        // слой для кружочков портов
     private val componentPane = Pane()                   // передний: компоненты
     private val mainPane = Pane()
@@ -115,8 +116,14 @@ class SchematicWindow : ProjectAware {
         portPane.isManaged = false
         portPane.isPickOnBounds = false
 
-        // Основной Pane — 5 слоёв: сетка (canvas), провода ELK (wirePane), линии (linePane), порты, компоненты
-        mainPane.children.setAll(canvas, wirePane, linePane, portPane, componentPane)
+        // Слой текстовых меток
+        labelPane.prefWidth = 5000.0
+        labelPane.prefHeight = 5000.0
+        labelPane.isManaged = false
+        labelPane.isPickOnBounds = false
+
+        // Основной Pane — 6 слоёв: сетка (canvas), провода ELK (wirePane), линии (linePane), метки (labelPane), порты, компоненты
+        mainPane.children.setAll(canvas, wirePane, linePane, labelPane, portPane, componentPane)
         mainPane.prefWidth = 5000.0
         mainPane.prefHeight = 5000.0
 
@@ -352,7 +359,57 @@ class SchematicWindow : ProjectAware {
         }
 
         // Рисуем метки для всех цепей с активными портами и labelMode
-        drawNetLabelsForActivePorts(activePorts)
+        drawLabelModeNetLabels(activePorts)
+    }
+
+    /**
+     * Рисует текстовые метки у каждого пина для цепей с labelMode.
+     * Метки рисуются в отдельном слое labelPane и остаются на экране.
+     */
+    private fun drawLabelModeNetLabels(activePorts: Set<String>) {
+        labelPane.children.clear()
+
+        // Находим цепи, которые содержат активные порты И включённую метку
+        val activeNets = nets.filter { net ->
+            net.labelMode && net.connections.any { conn ->
+                activePorts.contains(portKey(conn.refDes, conn.pinNumber))
+            }
+        }
+
+        activeNets.forEach { net ->
+            net.connections.forEach { conn ->
+                val pinCoords = getPinCoordinates(conn.refDes, conn.pinNumber) ?: return@forEach
+                val row = bomRows.find { it.refDes == conn.refDes } ?: return@forEach
+                val comp = componentsMap[row.componentId] ?: return@forEach
+                val node = nodesMap[row.bomnetId] ?: return@forEach
+
+                // Центр компонента
+                val symSize = SymbolRegistry.getInstance().getSymbolSize(comp.name)
+                val centerX = node.x + symSize.first / 2.0
+                val centerY = node.y + symSize.second / 2.0
+
+                // Вектор от центра к пину
+                val dx = pinCoords.first - centerX
+                val dy = pinCoords.second - centerY
+                val dist = kotlin.math.hypot(dx, dy)
+
+                // Смещение 20px от центра по направлению к пину
+                val offset = 20.0
+                val labelX = if (dist > 0) pinCoords.first + (dx / dist) * offset else pinCoords.first + 20.0
+                val labelY = if (dist > 0) pinCoords.second + (dy / dist) * offset else pinCoords.second + 10.0
+
+                val fontSize = 10.0
+                val netColorObj = netColor(net.name)
+                val colorCss = String.format("#%02X%02X%02X", (netColorObj.red * 255).toInt(), (netColorObj.green * 255).toInt(), (netColorObj.blue * 255).toInt())
+
+                val label = Label(net.name).apply {
+                    style = "-fx-font-size: $fontSize; -fx-font-family: SansSerif; -fx-text-fill: $colorCss;"
+                    layoutX = labelX - 20.0
+                    layoutY = labelY + 4.0
+                }
+                labelPane.children.add(label)
+            }
+        }
     }
 
     private fun controlPoint(start: Pair<Double, Double>, end: Pair<Double, Double>, offset: Double): Pair<Double, Double> {
@@ -418,59 +475,6 @@ class SchematicWindow : ProjectAware {
         val circle = portCircles[key] ?: return null
         // Circle создаётся с координатами в centerX/centerY
         return Pair(circle.centerX, circle.centerY)
-    }
-
-    /**
-     * Рисует текстовые метки у каждого пина для цепей с labelMode.
-     */
-    private fun drawNetLabelsForActivePorts(activePorts: Set<String>) {
-        // Находим цепи, которые содержат активные порты И включённую метку
-        val activeNets = nets.filter { net ->
-            net.labelMode && net.connections.any { conn ->
-                activePorts.contains(portKey(conn.refDes, conn.pinNumber))
-            }
-        }
-
-        activeNets.forEach { net ->
-            // Рисуем метки только для найденных пинов
-            val drawnPins = mutableListOf<String>()
-            net.connections.forEach { conn ->
-                val pinCoords = getPinCoordinates(conn.refDes, conn.pinNumber) ?: return@forEach
-                val row = bomRows.find { it.refDes == conn.refDes } ?: return@forEach
-                val comp = componentsMap[row.componentId] ?: return@forEach
-                val node = nodesMap[row.bomnetId] ?: return@forEach
-
-                val direction = getPinDirection(comp, conn.pinNumber, node)
-
-                // Центр компонента
-                val symSize = SymbolRegistry.getInstance().getSymbolSize(comp.name)
-                val centerX = node.x + symSize.first / 2.0
-                val centerY = node.y + symSize.second / 2.0
-
-                // Вектор от центра к пину
-                val dx = pinCoords.first - centerX
-                val dy = pinCoords.second - centerY
-                val dist = kotlin.math.hypot(dx, dy)
-
-                // Смещение 20px от центра по направлению к пину
-                val offset = 20.0
-                val labelX = if (dist > 0) pinCoords.first + (dx / dist) * offset else pinCoords.first + 20.0
-                val labelY = if (dist > 0) pinCoords.second + (dy / dist) * offset else pinCoords.second + 10.0
-
-                val fontSize = 10.0
-                val netColorObj = netColor(net.name)
-                val colorCss = String.format("#%02X%02X%02X", (netColorObj.red * 255).toInt(), (netColorObj.green * 255).toInt(), (netColorObj.blue * 255).toInt())
-
-                val label = Label(net.name).apply {
-                    style = "-fx-font-size: $fontSize; -fx-font-family: SansSerif; -fx-text-fill: $colorCss;"
-                    layoutX = labelX - 20.0
-                    layoutY = labelY + 4.0
-                }
-                linePane.children.add(label)
-                drawnPins.add(portKey(conn.refDes, conn.pinNumber))
-            }
-            // Метки рисуются даже если не все пины найдены
-        }
     }
 
     /**
