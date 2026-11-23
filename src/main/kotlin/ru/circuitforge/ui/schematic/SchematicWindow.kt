@@ -527,7 +527,7 @@ class SchematicWindow : ProjectAware {
 
             // Вычисляем размеры компонента из первого child'а
             val (compW, compH) = when (firstChild) {
-                is javafx.scene.layout.Pane -> firstChild.prefWidth to firstChild.prefHeight
+                is javafx.scene.layout.Pane -> firstChild.minWidth(-1.0) to firstChild.minHeight(-1.0)
                 is Canvas -> firstChild.boundsInLocal.width to firstChild.boundsInLocal.height
                 else -> 100.0 to 80.0
             }
