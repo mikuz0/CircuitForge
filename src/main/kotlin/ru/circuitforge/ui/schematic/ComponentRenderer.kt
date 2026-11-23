@@ -80,15 +80,15 @@ object ComponentRenderer {
         // Подписи RefDes и Comment
         val refDesLabel = Label(row.refDes).apply {
             style = "-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: black;"
-            layoutX = -20.0
-            layoutY = -symH / 2.0 - 20.0
+            layoutX = 20.0
+            layoutY =  - 60.0
         }
         group.children.add(refDesLabel)
         
         val commentLabel = Label(row.comment).apply {
             style = "-fx-font-size: 11px; -fx-text-fill: gray;"
-            layoutX = -20.0
-            layoutY = -symH / 2.0 - 5.0
+            layoutX = 20.0
+            layoutY =  - 40.0
         }
         group.children.add(commentLabel)
     }
