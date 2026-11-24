@@ -1,0 +1,172 @@
+{
+    "schemaVersion": 1,
+    "nets": [
+        {
+            "name": "GND",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "33"
+                },
+                {
+                    "refDes": "X1",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "X1",
+                    "pinNumber": "4"
+                },
+                {
+                    "refDes": "C1",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "C2",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "C3",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "C5",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "C6",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "C7",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "C8",
+                    "pinNumber": "2"
+                }
+            ],
+            "labelMode": true
+        },
+        {
+            "name": "RST_N",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "22"
+                },
+                {
+                    "refDes": "C1",
+                    "pinNumber": "1"
+                }
+            ]
+        },
+        {
+            "name": "VDD_RF",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "23"
+                },
+                {
+                    "refDes": "C2",
+                    "pinNumber": "1"
+                }
+            ]
+        },
+        {
+            "name": "RF",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "24"
+                },
+                {
+                    "refDes": "E1",
+                    "pinNumber": "1"
+                }
+            ]
+        },
+        {
+            "name": "VDDDEC",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "5"
+                },
+                {
+                    "refDes": "C3",
+                    "pinNumber": "1"
+                }
+            ]
+        },
+        {
+            "name": "DCDC_SW",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "13"
+                },
+                {
+                    "refDes": "L1",
+                    "pinNumber": "1"
+                }
+            ]
+        },
+        {
+            "name": "VDD_PHYPLUS",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "14"
+                },
+                {
+                    "refDes": "L1",
+                    "pinNumber": "2"
+                },
+                {
+                    "refDes": "C6",
+                    "pinNumber": "1"
+                },
+                {
+                    "refDes": "C7",
+                    "pinNumber": "1"
+                },
+                {
+                    "refDes": "C5",
+                    "pinNumber": "1"
+                },
+                {
+                    "refDes": "C8",
+                    "pinNumber": "1"
+                }
+            ],
+            "labelMode": true
+        },
+        {
+            "name": "XC1",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "16"
+                },
+                {
+                    "refDes": "X1",
+                    "pinNumber": "1"
+                }
+            ]
+        },
+        {
+            "name": "XC2",
+            "connections": [
+                {
+                    "refDes": "DD1",
+                    "pinNumber": "17"
+                },
+                {
+                    "refDes": "X1",
+                    "pinNumber": "3"
+                }
+            ]
+        }
+    ]
+}

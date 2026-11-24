@@ -1,0 +1,377 @@
+Контекст проекта CircuitForge для нейросети-генератора схем
+
+ИСТОЧНИК ПРАВДЫ ПРИЛАГАЕМЫ СХЕМЫ, РИСУНКИ, ДТАТА шиты
+
+1. О проекте
+
+CircuitForge — десктопное приложение на Kotlin + JavaFX 21 для проектирования электронных схем. Состоит из модулей:
+
+    Components — библиотека компонентов (резисторы, конденсаторы, МК)
+
+    BOM — перечень элементов (ПЭ3)
+
+    Nets — цепи и соединения
+
+    Schematic — визуализация схемы
+
+Нейросеть получает изображение схемы (скан, экспорт из KiCad/Altium, рукописный рисунок) и должна создать файлы проекта в формате CircuitForge.
+2. Структура проекта
+text
+
+<workspace>/<machineName>/
+├── project.cfproj
+├── <machineName>.bom.json
+├── <machineName>.nets.json
+├── <machineName>.schematic.json
+├── components/
+│   ├── resistor.cfcomp
+│   ├── capacitor.cfcomp
+│   ├── capacitor-10.cfcomp
+│   ├── capacitor-100nf.cfcomp
+│   └── stm32f103c8t6.cfcomp
+└── exports/
+
+    Папка проекта = machineName (машинное имя, не человеческое).
+
+    Файлы данных (bom, nets, schematic) имеют префикс <machineName>..
+
+    project.cfproj — единственный файл без префикса (манифест).
+
+    components/ и exports/ — директории без префикса.
+
+3. Модели данных
+3.1. Компонент (*.cfcomp)
+ВЕРСИИ КОМПОНЕНТОВ СОЗДАЮТСЯ КАК ФАЙЛЫ КОМПОНЕНТОВ
+Например: конденсаторы разного номинала, имеют несколько файлов компонентов capacitor.cfcomp с разными id
+json
+
+{
+  "schemaVersion": 1,
+  "id": "f094478c-941f-4917-8d1e-f67129de11a9",
+  "name": "Resistor",
+  "description": "Generic resistor, 0603 package",
+  "model3dPath": null,
+  "refPrefix": "R",
+  "mainProperties": [
+    { "key": "Номинал", "value": "10к", "unit": "" },
+    { "key": "Мощность", "value": "0.1", "unit": "Вт" },
+    { "key": "Корпус", "value": "0603", "unit": "" }
+  ],
+  "extraProperties": [
+    { "key": "Допуск", "value": "±1", "unit": "%" },
+    { "key": "T_A_min", "value": "-55", "unit": "°C" },
+    { "key": "T_A_max", "value": "+155", "unit": "°C" },
+    { "key": "T_j_min", "value": "нет данных", "unit": "°C" },
+    { "key": "T_j_max", "value": "нет данных", "unit": "°C" },
+    { "key": "T_stg_min", "value": "-55", "unit": "°C" },
+    { "key": "T_stg_max", "value": "+155", "unit": "°C" }
+  ],
+  "ports": [
+    { "number": 1, "pinNumber": "1", "name": "Pin1", "description": "Terminal 1" },
+    { "number": 2, "pinNumber": "2", "name": "Pin2", "description": "Terminal 2" }
+  ]
+}
+
+Правила:
+
+    schemaVersion — всегда 1.
+
+    id — UUID v4, генерируется случайно. Никогда не меняется при редактировании (переименование файла/имени компонента сохраняет id).
+
+    name — латиница, PascalCase (Resistor, Capacitor, STM32F103C8T6). Используется для генерации имени файла (slug).
+
+    description — свободный текст.
+
+    model3dPath — null или относительный путь к 3D-модели (например, models/resistor.step). Опционально.
+
+    refPrefix — заглавные латинские буквы (R, C, D, DD, U, J, X). Только A-Z, 0-9, _. Используется для генерации refDes в BOM.
+
+    mainProperties / extraProperties — массивы {key, value, unit}. Ключи уникальны в пределах массива.
+
+    ports[].number — порядковый номер (1, 2, 3, ...), целое.
+
+    ports[].pinNumber — обозначение на корпусе ("1", "2", "PA0", "VCC", "GND"). Строка.  Соответствует наименованию в описании на компонент, схеме или рисунке.
+    ports[].name / ports[].description — свободный текст.
+
+Имя файла (slug): генерируется из name автоматически: lowercase, пробелы → -, только a-z0-9-, схлопывание -. Пример: STM32F103C8T6 → stm32f103c8t6.cfcomp. При конфликте — суффикс -1, -2, ... (resistor-1.cfcomp). Slug не хранится внутри файла — это имя файла.
+
+Температурные параметры (в extraProperties, если применимо):
+Поле	Сокращение	Расшифровка
+Минимальная рабочая температура	T_A_min	Ambient operating temperature, min
+Максимальная рабочая температура	T_A_max	Ambient operating temperature, max
+Предельная температура минимальная	T_j_min	Junction temperature, min
+Предельная температура максимальная	T_j_max	Junction temperature, max
+Температура хранения мин	T_stg_min	Storage temperature, min
+Температура хранения макс	T_stg_max	Storage temperature, max
+
+    T_A (Ambient) — температура окружающей среды, при которой компонент работает.
+
+    T_j (Junction) — температура полупроводникового перехода. Для резисторов/конденсаторов без p-n перехода — "нет данных".
+
+    T_stg (Storage) — температура хранения (без питания).
+
+    Если параметр не найден — "value": "нет данных", unit остаётся "°C".
+
+    Не объединять в одно поле «Температурный диапазон» — это устаревший формат.
+
+3.2. BOM (<machineName>.bom.json)
+ВЕРСИИ КОМПОНЕНТОВ СОЗДАЮТСЯ КАК ФАЙЛЫ КОМПОНЕНТОВ
+тут только ссылки на рерсии компонентов
+json
+
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "bomnetId": "a1b2c3d4-e5f6-47a8-9b0c-1d2e3f4a5b6c",
+      "number": 1,
+      "refDes": "R1",
+      "componentId": "f094478c-941f-4917-8d1e-f67129de11a9",
+      "comment": "10к 0603 должен быть создан в компонентах"
+    },
+    {
+      "bomnetId": "b2c3d4e5-f6a7-48b9-8c0d-2e3f4a5b6c7d",
+      "number": 2,
+      "refDes": "C1",
+      "componentId": "e92eb785-2ba1-4eb7-9bd8-6c2b51a4a402",
+      "comment": "100нФ 0603 должен быть создан в компонентах"
+    }
+  ]
+}
+
+Правила:
+
+    bomnetId — UUID v4, генерируется случайно. Уникален в пределах проекта. Связывает BOM-строку с узлом схемы (SchematicNode.bomnetId).
+
+    number — порядковый номер в списке (1, 2, 3, ...). При сохранении BOM перенумеровывается автоматически.
+
+    refDes — позиционное обозначение: <refPrefix><номер> (R1, C2, DD1). Уникален в пределах проекта. Генерируется из Component.refPrefix.
+
+    componentId — UUID компонента из .cfcomp файла. Стабильная ссылка.
+
+    comment — краткое описание: "<номинал> <корпус>" или "<модель> <корпус>".
+
+Чего НЕТ в BomItem: componentName, componentSlug, refPrefix. Эти поля — производные от компонента и не хранятся в BOM. При загрузке BomRepository.loadRows резолвит их из components/ по componentId. В файле их писать не нужно.
+3.3. Nets (<machineName>.nets.json)
+json
+
+{
+  "schemaVersion": 1,
+  "nets": [
+    {
+      "name": "VCC_3V3",
+      "connections": [
+        { "refDes": "DD1", "pinNumber": "7" },
+        { "refDes": "R1", "pinNumber": "1" },
+        { "refDes": "C1", "pinNumber": "1" }
+      ]
+    },
+    {
+      "name": "GND",
+      "connections": [
+        { "refDes": "DD1", "pinNumber": "8" },
+        { "refDes": "C1", "pinNumber": "2" }
+      ]
+    }
+  ]
+}
+
+Правила:
+
+    name — имя цепи. Только латиница, цифры, подчёркивание. Обычно заглавными (VCC, GND, SDA, SCL, UART_TX). Уникально в пределах проекта.
+
+    connections — список пар (refDes, pinNumber).
+
+        refDes — ссылка на BomItem.refDes (не на компонент напрямую).
+
+        pinNumber — ссылка на Component.ports[].pinNumber.
+
+    Пин может быть только в одной цепи (физическое ограничение). Валидация проверяет это при сохранении.
+
+    validate проверяет: refDes есть в BOM, pinNumber есть у компонента, найденного через BOM.
+
+3.4. Schematic (<machineName>.schematic.json)
+json
+
+{
+  "schemaVersion": 1,
+  "nodes": [
+    { "bomnetId": "a1b2c3d4-e5f6-47a8-9b0c-1d2e3f4a5b6c", "x": 250.0, "y": 200.0, "rotation": 0.0 },
+    { "bomnetId": "b2c3d4e5-f6a7-48b9-8c0d-2e3f4a5b6c7d", "x": 500.0, "y": 200.0, "rotation": 0.0 }
+  ]
+}
+
+Правила:
+
+    bomnetId — ссылка на BomItem.bomnetId.
+
+    x, y — координаты в пикселях, кратные 12.5 (сетка).
+
+    rotation — угол поворота в градусах: 0, 90, 180, 270.
+
+    Рекомендуемый шаг: 250px по X, 200px по Y.
+
+3.5. Project (project.cfproj)
+json
+
+{
+  "name": "Мой проект",
+  "machineName": "moj-proekt",
+  "created": "2026-11-20T08:48:42.687739569Z"
+}
+
+Правила:
+
+    name — человеческое имя проекта, свободный текст (может содержать кириллицу, пробелы).
+
+    machineName — машинное имя: lowercase, пробелы → -, только a-z0-9-. Совпадает с именем папки проекта и с префиксом файлов данных (<machineName>.bom.json и т.д.). Генерируется из name автоматически.
+
+    created — ISO-8601 timestamp (Instant). Задаётся при создании.
+
+    version — целое, по умолчанию 1, в JSON не пишется, если равно 1.
+
+Важно для генератора: при создании проекта с именем "MyProject":
+
+    папка: myproject/;
+
+    файлы: myproject.bom.json, myproject.nets.json, myproject.schematic.json;
+
+    project.cfproj: {"name": "MyProject", "machineName": "myproject", "created": "..."}.
+
+Если name содержит только спецсимволы (например, "!!!"), machineName будет пустым — такой проект создать нельзя (ошибка "Project name must contain at least one letter or digit").
+4. Стандартные префиксы компонентов
+Префикс	Тип	Пример
+R	Резистор	R1, R2, R10
+C	Конденсатор	C1, C2, C10
+L	Катушка индуктивности	L1, L2
+D	Диод	D1, D2
+DD	Микросхема (цифровая)	DD1, DD2
+U	Микросхема (аналоговая)	U1, U2
+Q	Транзистор	Q1, Q2
+J	Разъём	J1, J2, USB1
+X	Кристалл/резонатор	X1, Y1
+SW	Кнопка/переключатель	SW1, SW2
+LED	Светодиод	LED1, LED2
+F	Предохранитель	F1, F2
+
+refPrefix в .cfcomp — это префикс, из которого генерируется refDes в BOM. Например, refPrefix: "R" → R1, R2; refPrefix: "DD" → DD1, DD2.
+5. Типовые компоненты (шаблоны)
+Резистор (2 порта)
+json
+
+{
+  "schemaVersion": 1,
+  "id": "<uuid>",
+  "name": "Resistor",
+  "description": "Generic resistor",
+  "model3dPath": null,
+  "refPrefix": "R",
+  "mainProperties": [],
+  "extraProperties": [],
+  "ports": [
+    { "number": 1, "pinNumber": "1", "name": "Pin1", "description": "Terminal 1" },
+    { "number": 2, "pinNumber": "2", "name": "Pin2", "description": "Terminal 2" }
+  ]
+}
+
+Конденсатор (2 порта)
+json
+
+{
+  "schemaVersion": 1,
+  "id": "<uuid>",
+  "name": "Capacitor",
+  "description": "Generic capacitor",
+  "model3dPath": null,
+  "refPrefix": "C",
+  "mainProperties": [],
+  "extraProperties": [],
+  "ports": [
+    { "number": 1, "pinNumber": "1", "name": "Pin1", "description": "Terminal 1" },
+    { "number": 2, "pinNumber": "2", "name": "Pin2", "description": "Terminal 2" }
+  ]
+}
+
+Микросхема (N портов)
+
+Порты нумеруются по часовой стрелке от ключа/метки "1" на корпусе. pinNumber — обозначение на корпусе ("1", "PA0", "VCC", "GND"). number — порядковый (1..N).
+Разъём (N портов)
+
+Порты нумеруются последовательно (1, 2, 3, ... N).
+6. Инструкция для нейросети
+
+При анализе изображения схемы:
+
+    Распознай компоненты — определи тип (резистор, конденсатор, МК, разъём), номинал, корпус.
+
+    Создай файлы компонентов — для каждого уникального типа создай .cfcomp файл в components/. Имя файла — slug от name (lowercase, a-z0-9-). Используй стандартные шаблоны. id — новый UUID v4 для каждого компонента.
+
+    Создай BOM — для каждого экземпляра компонента на схеме создай запись в <machineName>.bom.json. Назначь refDes по стандартным префиксам (<refPrefix><номер>). bomnetId — новый UUID v4. componentId — UUID соответствующего .cfcomp. comment — краткое описание.
+
+    Распознай цепи — определи, какие пины соединены между собой. Создай записи в <machineName>.nets.json. refDes и pinNumber должны ссылаться на существующие BOM-строки и порты компонентов. Каждый пин — только в одной цепи.
+
+    Расположи компоненты — задай координаты в <machineName>.schematic.json. bomnetId — ссылка на BOM-строку. Координаты кратны 12.5px, шаг 250px по X / 200px по Y.
+
+    Создай project.cfproj — name (человеческое), machineName (slug от name), created (ISO-8601). Папка проекта = machineName.
+
+Важно:
+
+    Все id компонентов — уникальные UUID v4.
+
+    Все bomnetId — уникальные UUID v4 (не bom-1, не bom-2).
+
+    componentSlug в BOM не пишется — резолвится из components/ по componentId.
+
+    componentName, refPrefix в BOM не пишутся — производные от компонента.
+
+    refDes уникален в пределах проекта.
+
+    pinNumber уникален в пределах компонента.
+
+    Координаты кратны 12.5.
+
+    Имя папки проекта и префикс файлов данных = machineName.
+
+7. Пример полного проекта
+
+Изображение: схема с МК STM32F103C8T6, резистором 10к, конденсатором 100нФ, разъёмом USB.
+
+Результат:
+text
+
+my-project/
+├── project.cfproj
+├── my-project.bom.json
+├── my-project.nets.json
+├── my-project.schematic.json
+├── components/
+│   ├── stm32f103c8t6.cfcomp
+│   ├── resistor.cfcomp
+│   ├── capacitor.cfcomp
+│   └── usb-c.cfcomp
+└── exports/
+
+project.cfproj:
+json
+
+{
+  "name": "My Project",
+  "machineName": "my-project",
+  "created": "2026-11-20T10:00:00.000000000Z"
+}
+
+8. Ограничения
+
+    Максимум 1000 компонентов в одном проекте.
+
+    Максимум 100 портов у одного компонента.
+
+    Имя цепи: только латиница, цифры, подчёркивание.
+
+    refPrefix: только заглавные латинские буквы, цифры, _.
+
+    pinNumber: строка (может быть "1", "PA0", "VCC", "GND").
+
+    machineName: ^[a-z0-9][a-z0-9-]*$, непустой.
+
+    refDes: уникален в пределах проекта, формат <refPrefix><число> (но допускаются буквенные суффиксы, если так задано вручную — валидатор BOM проверяет только префикс).

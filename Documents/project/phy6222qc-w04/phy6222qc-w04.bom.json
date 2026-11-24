@@ -1,0 +1,92 @@
+{
+    "items": [
+        {
+            "bomnetId": "3f7a9c2e-1b4d-4e8a-9c3f-2d5e8a1b4c7d",
+            "number": 1,
+            "refDes": "DD1",
+            "componentId": "7f3a2b1c-4d5e-4f6a-8b9c-0d1e2f3a4b5c",
+            "componentSlug": "phy6222",
+            "comment": "PHY6222 QFN32"
+        },
+        {
+            "bomnetId": "5a8c2e4f-7b1d-4a9c-8e2f-3b6d9c2e5a8f",
+            "number": 2,
+            "refDes": "X1",
+            "componentId": "8a4b3c2d-5e6f-4a7b-9c0d-1e2f3a4b5c6d",
+            "componentSlug": "crystal-16mhz",
+            "comment": "16M 12pF 10ppm"
+        },
+        {
+            "bomnetId": "7c2e5a8b-4d9f-4b1e-a3c7-5e8f2a4d9c1b",
+            "number": 3,
+            "refDes": "C1",
+            "componentId": "9b5c4d3e-6f7a-4b8c-ad1e-2f3a4b5c6d7e",
+            "componentSlug": "capacitor-1uf",
+            "comment": "1uF 0603"
+        },
+        {
+            "bomnetId": "9e4b7c2d-6a8f-4c3a-b5e9-7a2d4c8f3b6e",
+            "number": 4,
+            "refDes": "C2",
+            "componentId": "b7e6f5a4-8b9c-4dae-af3a-4b5c6d7e8f9a",
+            "componentSlug": "capacitor-2u2",
+            "comment": "2.2uF 0603"
+        },
+        {
+            "bomnetId": "2b6d9e4a-8c2f-4d5b-9a7c-3e8f5a2d6b9c",
+            "number": 5,
+            "refDes": "C3",
+            "componentId": "a6d5e4f3-7a8b-4c9d-be2f-3a4b5c6d7e8f",
+            "componentSlug": "capacitor-100nf",
+            "comment": "0.1uF 0603"
+        },
+        {
+            "bomnetId": "4d8a2b6e-9f4c-4e7d-a8b2-5c9e4b2a7d3f",
+            "number": 6,
+            "refDes": "C5",
+            "componentId": "c8f7a6b5-9cad-4ebf-ba4b-5c6d7e8f9aab",
+            "componentSlug": "capacitor-4u7",
+            "comment": "4.7uF 0603"
+        },
+        {
+            "bomnetId": "6e2c4d8a-1a6e-4f9c-b3d5-7e2a4c8b5d9e",
+            "number": 7,
+            "refDes": "C6",
+            "componentId": "9b5c4d3e-6f7a-4b8c-ad1e-2f3a4b5c6d7e",
+            "componentSlug": "capacitor-1uf",
+            "comment": "1uF 0603"
+        },
+        {
+            "bomnetId": "8a4e6c2d-3b8f-4a2e-9c5a-2d6e8f4a7c3b",
+            "number": 8,
+            "refDes": "C7",
+            "componentId": "a6d5e4f3-7a8b-4c9d-be2f-3a4b5c6d7e8f",
+            "componentSlug": "capacitor-100nf",
+            "comment": "0.1uF 0603"
+        },
+        {
+            "bomnetId": "b2c8a4e6-5d2a-4b4f-8e6c-4a8b2d6e9f5a",
+            "number": 9,
+            "refDes": "C8",
+            "componentId": "a6d5e4f3-7a8b-4c9d-be2f-3a4b5c6d7e8f",
+            "componentSlug": "capacitor-100nf",
+            "comment": "0.1uF 0603"
+        },
+        {
+            "bomnetId": "d4e6b2a8-7c4f-4d6a-9a8e-6c2d4b8a3e7f",
+            "number": 10,
+            "refDes": "L1",
+            "componentId": "d9a8b7c6-adbe-4fc0-8b5c-6d7e8f9a0abc",
+            "componentSlug": "inductor-10uh",
+            "comment": "10uH >300mA"
+        },
+        {
+            "bomnetId": "f6a8d4c2-9e6b-4f8c-b5a2-8d6e4c2a9b4f",
+            "number": 11,
+            "refDes": "E1",
+            "componentId": "eab9c8d7-becf-4ad1-9c6d-7e8f9a0b1bcd",
+            "componentSlug": "antenna",
+            "comment": "BLE antenna"
+        }
+    ]
+}

@@ -1,0 +1,59 @@
+{
+    "nodes": [
+        {
+            "bomnetId": "3f7a9c2e-1b4d-4e8a-9c3f-2d5e8a1b4c7d",
+            "x": 150.0,
+            "y": 137.5
+        },
+        {
+            "bomnetId": "5a8c2e4f-7b1d-4a9c-8e2f-3b6d9c2e5a8f",
+            "x": 875.0,
+            "y": 525.0
+        },
+        {
+            "bomnetId": "7c2e5a8b-4d9f-4b1e-a3c7-5e8f2a4d9c1b",
+            "x": 912.5,
+            "y": 462.5
+        },
+        {
+            "bomnetId": "9e4b7c2d-6a8f-4c3a-b5e9-7a2d4c8f3b6e",
+            "x": 925.0,
+            "y": 262.5
+        },
+        {
+            "bomnetId": "2b6d9e4a-8c2f-4d5b-9a7c-3e8f5a2d6b9c",
+            "x": 25.0,
+            "y": 125.0
+        },
+        {
+            "bomnetId": "4d8a2b6e-9f4c-4e7d-a8b2-5c9e4b2a7d3f",
+            "x": 925.0,
+            "y": 950.0
+        },
+        {
+            "bomnetId": "6e2c4d8a-1a6e-4f9c-b3d5-7e2a4c8b5d9e",
+            "x": 925.0,
+            "y": 825.0
+        },
+        {
+            "bomnetId": "8a4e6c2d-3b8f-4a2e-9c5a-2d6e8f4a7c3b",
+            "x": 700.0,
+            "y": 925.0
+        },
+        {
+            "bomnetId": "b2c8a4e6-5d2a-4b4f-8e6c-4a8b2d6e9f5a",
+            "x": 487.5,
+            "y": 912.5
+        },
+        {
+            "bomnetId": "d4e6b2a8-7c4f-4d6a-9a8e-6c2d4b8a3e7f",
+            "x": 925.0,
+            "y": 725.0
+        },
+        {
+            "bomnetId": "f6a8d4c2-9e6b-4f8c-b5a2-8d6e4c2a9b4f",
+            "x": 1025.0,
+            "y": 125.0
+        }
+    ]
+}
