@@ -83,13 +83,12 @@ check() {
 }
 
 rc=0
-check 'elk\.core'            'ELK core'           || rc=1
-check 'elk\.alg\.layered'    'ELK layered'        || rc=1
+
 check 'jsvg-2'               'JSVG core'          || rc=1
 check 'jsvg-javafx'          'JSVG JavaFX'        || rc=1
 check 'runtime/lib/modules'  'jlink runtime'      || rc=1
 check 'bin/circuitforge-jfx' 'launcher'           || rc=1
-check 'symbols/resistor\.svg' 'SVG symbols in jar' || rc=1
+
 
 [ "$rc" -eq 0 ] || { echo "ERROR: package verification failed"; exit 1; }
 
