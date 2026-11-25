@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 
 /**
  * Репозиторий для управления компонентами.
@@ -264,6 +265,34 @@ object ComponentRepository {
             throw e
         }
     }
+    /**
+     * Переименовывает файл компонента.
+     * Сохраняет все данные, меняет только имя файла.
+     */
+    fun renameComponent(projectDir: Path, oldSlug: String, newSlug: String): Boolean {
+        val oldPath = projectDir.resolve("components").resolve("${oldSlug}$CFCOMP_EXT")
+        val newPath = projectDir.resolve("components").resolve("${newSlug}$CFCOMP_EXT")
+
+        if (!Files.exists(oldPath)) {
+            logger.warn("Component file not found: $oldPath")
+            return false
+        }
+
+        if (Files.exists(newPath)) {
+            logger.warn("Target file already exists: $newPath")
+            return false
+        }
+
+        try {
+            Files.move(oldPath, newPath, StandardCopyOption.REPLACE_EXISTING)
+            logger.info("Component file renamed: $oldSlug -> $newSlug")
+            return true
+        } catch (e: Exception) {
+            logger.error("Failed to rename component: $oldSlug -> $newSlug", e)
+            return false
+        }
+    }
+
     /**
      * Находит компонент по его UUID, сканируя папку components.
      * Возвращает null, если компонент не найден.

@@ -50,7 +50,11 @@ class ComponentsWindow : ProjectAware {
     private val componentNameField = TextField()
     private val componentDescField = TextField()
     private val refPrefixField = TextField()
-    private val model3dField = TextField()
+
+    // Поля файла компонента
+    private val fileNameLabel = Label()
+    private val fileNameField = TextField()
+    private val renameButton = Button(I18n.tr("components.btn.rename.file") ?: "Переименовать")
 
     // Кнопки компонентов
     private val componentSaveButton = Button(I18n.tr("components.btn.save"))
@@ -175,21 +179,35 @@ class ComponentsWindow : ProjectAware {
         }
     }
 
-    private fun createComponentFormPanel(): VBox {
+    private fun createComponentFormPanel(): HBox {
         val grid = GridPane()
         grid.hgap = 10.0; grid.vgap = 8.0; grid.padding = Insets(10.0)
         val nameLabel = Label(I18n.tr("components.label.name"))
         val descLabel = Label(I18n.tr("components.label.description"))
         val refPrefixLabel = Label(I18n.tr("components.label.ref.prefix"))
-        val model3dLabel = Label(I18n.tr("components.label.model.3d"))
         GridPane.setConstraints(nameLabel, 0, 0); GridPane.setConstraints(componentNameField, 1, 0)
         GridPane.setConstraints(descLabel, 0, 1); GridPane.setConstraints(componentDescField, 1, 1)
         GridPane.setConstraints(refPrefixLabel, 0, 2); GridPane.setConstraints(refPrefixField, 1, 2)
-        GridPane.setConstraints(model3dLabel, 0, 3); GridPane.setConstraints(model3dField, 1, 3)
-        grid.children.setAll(nameLabel, componentNameField, descLabel, componentDescField, refPrefixLabel, refPrefixField, model3dLabel, model3dField)
+        grid.children.setAll(nameLabel, componentNameField, descLabel, componentDescField, refPrefixLabel, refPrefixField)
         val buttonBar = HBox(10.0, componentSaveButton, componentDuplicateButton, componentDeleteButton, componentRevertButton).apply { alignment = Pos.CENTER_LEFT }
-        return VBox(10.0, Label(I18n.tr("components.label.properties")), grid, buttonBar).apply {
+        val formPanel = VBox(10.0, Label(I18n.tr("components.label.properties")), grid, buttonBar).apply {
             padding = Insets(10.0); minWidth = 300.0
+        }
+
+        // Правая панель с информацией о файле
+        val filePanel = VBox(10.0,
+            Label(I18n.tr("components.label.file") ?: "Файл компонента:"),
+            fileNameLabel,
+            fileNameField,
+            renameButton
+        ).apply {
+            padding = Insets(10.0)
+            minWidth = 250.0
+        }
+
+        return HBox(20.0, formPanel, filePanel).apply {
+            padding = Insets(10.0)
+            alignment = Pos.TOP_LEFT
         }
     }
 
@@ -444,6 +462,7 @@ class ComponentsWindow : ProjectAware {
         componentDuplicateButton.setOnAction { duplicateComponent() }
         componentDeleteButton.setOnAction { deleteComponent() }
         componentRevertButton.setOnAction { revertComponent() }
+        renameButton.setOnAction { renameComponentFile() }
         portAddButton.setOnAction { addPortRow() }
         portDeleteButton.setOnAction { deletePort() }
         mainPropAddButton.setOnAction { addMainPropertyRow() }
@@ -452,7 +471,7 @@ class ComponentsWindow : ProjectAware {
         extraPropDeleteButton.setOnAction { deleteExtraProperty() }
         listOf(
             componentNameField.textProperty(), componentDescField.textProperty(),
-            refPrefixField.textProperty(), model3dField.textProperty(),
+            refPrefixField.textProperty(),
             mainPropKeyField.textProperty(), mainPropValueField.textProperty(), mainPropUnitField.textProperty(),
             extraPropKeyField.textProperty(), extraPropValueField.textProperty(), extraPropUnitField.textProperty()
         ).forEach { it.addListener { _, _, _ -> markDirty() } }
@@ -468,7 +487,7 @@ class ComponentsWindow : ProjectAware {
         val name = componentNameField.text.trim()
         val description = componentDescField.text.trim()
         val refPrefix = refPrefixField.text.trim().uppercase()
-        val model3d = model3dField.text.trim().takeIf { it.isNotEmpty() }
+        val model3d: String? = null
         if (name.isBlank()) { UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("components.alert.name.blank")); return }
         if (!validateRefPrefix(refPrefix)) return
         val originalSlug = editingComponentSlug
@@ -554,15 +573,55 @@ class ComponentsWindow : ProjectAware {
         loadComponentIntoForm(selected); logger.info("Component reverted: ${selected.name}")
     }
 
+    private fun renameComponentFile() {
+        val oldSlug = editingComponentSlug ?: return
+        val newName = fileNameField.text.trim()
+        if (newName.isBlank()) {
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("components.alert.file.name.blank"))
+            return
+        }
+        val newSlug = newName.removeSuffix(CFCOMP_EXT)
+        if (newSlug.isBlank()) {
+            UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("components.alert.file.name.invalid"))
+            return
+        }
+        val task = object : javafx.concurrent.Task<Boolean>() {
+            override fun call(): Boolean {
+                return projectPaths?.let { paths ->
+                    ComponentRepository.renameComponent(paths.projectDir, oldSlug, newSlug)
+                } ?: false
+            }
+            override fun succeeded() {
+                if (value == true) {
+                    editingComponentSlug = newSlug
+                    fileNameLabel.text = "$newSlug$CFCOMP_EXT"
+                    fileNameField.text = newSlug
+                    projectPaths?.let { paths -> componentList.setAll(ComponentRepository.listComponents(paths.projectDir)) }
+                    logger.info("Component file renamed: $oldSlug -> $newSlug")
+                } else {
+                    UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("components.alert.rename.failed"))
+                }
+            }
+            override fun failed() {
+                UiUtils.errorAlert(I18n.tr("common.alert.error"), exception?.message ?: I18n.tr("common.alert.unknown.error"))
+                logger.error("Failed to rename component file", exception)
+            }
+        }
+        executor.submit(task)
+    }
+
     private fun clearComponentForm() {
-        componentNameField.clear(); componentDescField.clear(); refPrefixField.clear(); model3dField.clear()
+        componentNameField.clear(); componentDescField.clear(); refPrefixField.clear()
+        fileNameLabel.text = ""; fileNameField.clear()
         editingComponentSlug = null; isDirty = false
     }
 
     private fun loadComponentIntoForm(summary: ComponentSummary) {
         editingComponentSlug = summary.slug
         componentNameField.text = summary.name; componentDescField.text = summary.description
-        refPrefixField.text = summary.refPrefix; model3dField.clear()
+        refPrefixField.text = summary.refPrefix
+        fileNameLabel.text = "${summary.slug}$CFCOMP_EXT"
+        fileNameField.text = summary.slug
         projectPaths?.let { paths ->
             val compPath = paths.componentsDir.resolve("${summary.slug}$CFCOMP_EXT")
             logger.info("Loading component: ${summary.slug} from $compPath")
