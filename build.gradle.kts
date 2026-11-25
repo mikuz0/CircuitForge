@@ -17,10 +17,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.slf4j:slf4j-simple:2.0.16")
 
-    // ELK Java — автоматическая раскладка схем
-    implementation("org.eclipse.elk:org.eclipse.elk.core:0.12.1")
-    implementation("org.eclipse.elk:org.eclipse.elk.alg.layered:0.12.1")
-
     // JSVG — нативная поддержка SVG в JavaFX
     implementation("com.github.weisj:jsvg:2.2.0")
     implementation("com.github.weisj:jsvg-javafx:2.2.0")

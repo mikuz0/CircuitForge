@@ -25,7 +25,6 @@ import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
-import ru.circuitforge.ui.schematic.layout.ElkLayoutEngine
 import ru.circuitforge.ui.schematic.symbols.SymbolRegistry
 import java.nio.file.Path
 import java.util.concurrent.Executors
@@ -714,20 +713,19 @@ class SchematicWindow : ProjectAware {
         val task = object : Task<Unit>() {
             override fun call() {
                 try {
-                    val engine = ElkLayoutEngine()
-                    val document = engine.layout(bomRows.toList(), nets.toList(), componentsMap)
+                    val nodes = generateGridCoordinates(bomRows.toList())
 
                     javafx.application.Platform.runLater {
-                        schematicNodes.setAll(document.nodes)
-                        schematicWires.setAll(document.wires)
+                        schematicNodes.setAll(nodes)
+                        schematicWires.clear()
                         drawSchematic()
-                        statusLabel.text = I18n.tr("schematic.status.layout_done")?.replace("{0}", document.nodes.size.toString())
-                            ?: "Раскладка завершена: ${document.nodes.size} компонентов"
+                        statusLabel.text = I18n.tr("schematic.status.layout_done")?.replace("{0}", nodes.size.toString())
+                            ?: "Раскладка завершена: ${nodes.size} компонентов"
                         statusLabel.style = "-fx-text-fill: green;"
-                        logger.info("ELK auto-layout completed: ${document.nodes.size} components")
+                        logger.info("Auto-layout completed: ${nodes.size} components")
                     }
                 } catch (e: Exception) {
-                    logger.error("ELK auto-layout failed", e)
+                    logger.error("Auto-layout failed", e)
                     javafx.application.Platform.runLater {
                         UiUtils.errorAlert(
                             I18n.tr("common.alert.error") ?: "Ошибка",
@@ -1014,21 +1012,12 @@ class SchematicWindow : ProjectAware {
 
                 val existingDoc = SchematicRepository.load(paths)
                 if (existingDoc.nodes.isEmpty()) {
-                    logger.info("No schematic data found, running ELK auto-layout")
-                    try {
-                        val engine = ElkLayoutEngine()
-                        val document = engine.layout(rows, netDoc.nets, componentsMap)
-                        SchematicRepository.save(paths, document)
-                        schematicNodes.setAll(document.nodes)
-                        schematicWires.setAll(document.wires)
-                        logger.info("ELK auto-layout completed: ${document.nodes.size} components")
-                    } catch (e: Exception) {
-                        logger.warn("ELK auto-layout failed, falling back to grid layout: ${e.message}", e)
-                        val nodes = generateGridCoordinates(rows)
-                        SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
-                        schematicNodes.setAll(nodes)
-                        schematicWires.clear()
-                    }
+                    logger.info("No schematic data found, running auto-layout")
+                    val nodes = generateGridCoordinates(rows)
+                    SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
+                    schematicNodes.setAll(nodes)
+                    schematicWires.clear()
+                    logger.info("Auto-layout completed: ${nodes.size} components")
                 } else {
                     schematicNodes.setAll(existingDoc.nodes)
                     schematicWires.setAll(existingDoc.wires)
