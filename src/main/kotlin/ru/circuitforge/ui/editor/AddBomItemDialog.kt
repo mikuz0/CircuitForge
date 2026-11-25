@@ -220,6 +220,11 @@ class AddBomItemDialog(
         prefixCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.component.refPrefix) }
         prefixCol.prefWidth = 50.0
 
+        // Колонка: Описание
+        val descCol = TableColumn<ComponentSearchResult, String>(I18n.tr("bom.dialog.add.col.description") ?: "Описание")
+        descCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.component.description) }
+        descCol.prefWidth = 250.0
+
         // Колонка: Основные свойства
         val propsCol = TableColumn<ComponentSearchResult, String>(I18n.tr("bom.dialog.add.col.mainProps") ?: "Основные свойства")
         propsCol.setCellValueFactory { cell ->
@@ -272,7 +277,7 @@ class AddBomItemDialog(
         }
         matchCol.prefWidth = 180.0
 
-        resultsTable.columns.setAll(nameCol, prefixCol, propsCol, portsCol, matchCol)
+        resultsTable.columns.setAll(nameCol, prefixCol, descCol, propsCol, portsCol, matchCol)
 
         // Двойной клик → добавить
         resultsTable.onMouseClicked = javafx.event.EventHandler { event ->
