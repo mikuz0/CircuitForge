@@ -3,6 +3,8 @@ package ru.circuitforge.ui.components
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import javafx.collections.transformation.SortedList
+import java.text.Collator
+import java.util.Locale
 import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.Scene
@@ -97,6 +99,25 @@ class ComponentsWindow : ProjectAware {
         setupPropertyTable(extraPropertyTable, extraPropertyList)
         setupEventHandlers()
         stage.scene = Scene(createRoot(), 1100.0, 750.0)
+    }
+
+    /**
+     * Извлекает числовой суффикс из имени для естественной сортировки.
+     * "Capacitor-1uf" -> (1, "capacitor-uf")
+     * "Capacitor" -> (0, "capacitor")
+     */
+    private fun extractNumber(name: String): Pair<Int, String> {
+        val lower = name.lowercase()
+        // Ищем число в конце или после дефиса
+        val regex = Regex("^([a-z0-9\\-_]*)(\\d+)(.*)$")
+        val match = regex.find(lower)
+        return if (match != null) {
+            val num = match.groupValues[2].toInt()
+            val rest = match.groupValues[1] + match.groupValues[3]
+            Pair(num, rest)
+        } else {
+            Pair(0, lower)
+        }
     }
 
     private fun createRoot(): BorderPane {
@@ -245,7 +266,17 @@ class ComponentsWindow : ProjectAware {
             setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.extraPropertiesCount.toString()) }; prefWidth = 70.0
         }
         componentTable.columns.setAll(nameCol, descCol, refPrefixCol, portsCol, mainPropsCol, extraPropsCol)
-        componentTable.items = SortedList(componentList)
+        val sortedList = SortedList(componentList, { a, b ->
+            val nameA = a.name.lowercase()
+            val nameB = b.name.lowercase()
+            // Извлекаем числовые суффиксы для естественной сортировки
+            val (numA, restA) = extractNumber(nameA)
+            val (numB, restB) = extractNumber(nameB)
+            val restCompare = restA.compareTo(restB, ignoreCase = true)
+            if (restCompare != 0) restCompare else numA.compareTo(numB)
+        })
+        sortedList.comparatorProperty().bind(componentTable.comparatorProperty())
+        componentTable.items = sortedList
         componentTable.selectionModel.selectedItemProperty().addListener { _, _, new -> if (new != null) loadComponentIntoForm(new) }
     }
 

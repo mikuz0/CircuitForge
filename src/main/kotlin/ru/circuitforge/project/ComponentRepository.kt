@@ -113,8 +113,22 @@ object ComponentRepository {
             java.util.UUID.randomUUID().toString()
         }
 
-        // 2. Генерируем новое имя файла (передаем originalSlug как исключение!)
-        val newSlug = generateUniqueSlug(projectDir, name, originalSlug) // <-- ИСПРАВЛЕНО
+        // 2. Генерируем новое имя файла
+        // Загружаем компонент и сравниваем имя — если имя не изменилось, сохраняем текущий slug
+        val oldName = if (Files.exists(oldPath)) {
+            try { load(oldPath).name } catch (e: Exception) { null }
+        } else {
+            null
+        }
+        val generatedSlug = generateSlug(name)
+        val newSlug = if (oldName != null && oldName == name) {
+            // Имя компонента не изменилось — пользователь мог переименовать файл вручную
+            // Сохраняем текущий slug (originalSlug)
+            originalSlug
+        } else {
+            // Имя изменилось — генерируем новый slug
+            generateUniqueSlug(projectDir, name, originalSlug)
+        }
         val newPath = componentsDir.resolve("${newSlug}$CFCOMP_EXT")
 
         // 3. Создаем объект с сохраненным ID
