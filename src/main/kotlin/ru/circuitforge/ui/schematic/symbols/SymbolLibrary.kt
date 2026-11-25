@@ -17,70 +17,75 @@ class SymbolLibrary private constructor(
 ) {
     private val logger = LoggerFactory.getLogger(SymbolLibrary::class.java)
     private val parser = SvgParser()
-    
+
     private val symbolCache = mutableMapOf<String, Pane>()
     private val sizeCache = mutableMapOf<String, Pair<Double, Double>>()
-    
+
     companion object {
         private val json = Json {
             ignoreUnknownKeys = true
             isLenient = true
         }
-        
+
         /**
          * Создаёт SymbolLibrary из директории проекта.
-         * Загружает базовый конфиг из resources, затем мерджит с project-конфигом.
+         * Загружает базовый конфиг из resources, затем мерджит со всеми конфигурационными файлами из папки symbols.
+         * Файлы загружаются в лексикографическом порядке; последний переопределяет предыдущие.
          */
         fun fromProjectDir(projectDir: Path): SymbolLibrary {
             val symbolsDir = projectDir.resolve("symbols")
-            val configFile = symbolsDir.resolve("symbols.json")
-            
+
             // 1. Базовый конфиг из resources
             val baseConfig = loadDefaultConfig() ?: SymbolConfig()
-            
-            // 2. Project конфиг (если есть)
-            val projectConfig = try {
-                if (Files.exists(configFile)) {
-                    val content = Files.readString(configFile)
-                    json.decodeFromString(SymbolConfig.serializer(), content)
-                } else {
-                    null
+
+            // 2. Все project/symbols/*.json конфиги
+            var config = baseConfig
+            try {
+                if (Files.exists(symbolsDir) && Files.isDirectory(symbolsDir)) {
+                    Files.list(symbolsDir)
+                        .filter { it.toString().endsWith(".json") }
+                        .sorted()
+                        .forEach { configFile ->
+                            try {
+                                val content = Files.readString(configFile)
+                                val projectConfig = json.decodeFromString(SymbolConfig.serializer(), content)
+                                config = mergeConfigs(config, projectConfig)
+                                LoggerFactory.getLogger(SymbolLibrary::class.java).info("Loaded symbol config from: $configFile")
+                            } catch (e: Exception) {
+                                LoggerFactory.getLogger(SymbolLibrary::class.java).warn("Failed to load symbol config from $configFile: ${e.message}")
+                            }
+                        }
                 }
             } catch (e: Exception) {
-                LoggerFactory.getLogger(SymbolLibrary::class.java)
-                    .warn("Failed to load project config: ${e.message}")
-                null
+                LoggerFactory.getLogger(SymbolLibrary::class.java).warn("Failed to list symbols directory: ${e.message}")
             }
-            
-            // 3. Мердж: project overrides base
-            val config = projectConfig?.let { mergeConfigs(baseConfig, it) } ?: baseConfig
-            
+
             return SymbolLibrary(symbolsDir, config)
         }
-        
+
         /**
          * Мерджит два конфига: project-конфиг переопределяет базовый.
          */
         private fun mergeConfigs(base: SymbolConfig, project: SymbolConfig): SymbolConfig {
             val mergedSymbols = base.symbols.toMutableMap()
             mergedSymbols.putAll(project.symbols)
-            
+
             val mergedMappings = base.mappings.toMutableMap()
             mergedMappings.putAll(project.mappings)
-            
+
             return SymbolConfig(
                 symbols = mergedSymbols,
                 mappings = mergedMappings
             )
         }
-        
+
         /**
          * Загружает дефолтный конфиг из resources/symbols/symbols.json.
          */
         private fun loadDefaultConfig(): SymbolConfig? {
             val resourcePath = "/symbols/symbols.json"
             val inputStream = javaClass.getResourceAsStream(resourcePath) ?: return null
-            
+
             return try {
                 val content = inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                 json.decodeFromString(SymbolConfig.serializer(), content)
@@ -91,7 +96,7 @@ class SymbolLibrary private constructor(
             }
         }
     }
-    
+
     /**
      * Получает symbolType по имени компонента.
      * Использует mappings из конфига, fallback — lowercase имя.
@@ -102,7 +107,7 @@ class SymbolLibrary private constructor(
             ?: mappings[componentName.lowercase()]
             ?: componentName.lowercase()
     }
-    
+
     /**
      * Получает размер символа (ширина, высота).
      */
@@ -114,7 +119,7 @@ class SymbolLibrary private constructor(
         }
         return null
     }
-    
+
     /**
      * Получает позицию порта (x, y) относительно центра символа.
      */
@@ -123,7 +128,7 @@ class SymbolLibrary private constructor(
             Pair(it.x, it.y)
         }
     }
-    
+
     /**
      * Получает SVG-узел символа (с кэшированием).
      */
@@ -132,14 +137,14 @@ class SymbolLibrary private constructor(
             loadSymbol(symbolType)
         }
     }
-    
+
     /**
      * Загружает SVG-символ из файла.
      * Если нет в конфиге, пытается загрузить из resources.
      */
     private fun loadSymbol(symbolType: String): Pane {
         val definition = config.symbols[symbolType]
-        
+
         return if (definition != null) {
             val svgFile = symbolsDir.resolve(definition.file)
             if (Files.exists(svgFile)) {
@@ -155,7 +160,7 @@ class SymbolLibrary private constructor(
                 ?: createFallbackPane(symbolType)
         }
     }
-    
+
     /**
      * Загружает SVG-символ из файла.
      */
@@ -179,14 +184,14 @@ class SymbolLibrary private constructor(
             createFallbackPane(symbolType)
         }
     }
-    
+
     /**
      * Загружает SVG-символ из resources.
      */
     private fun loadSymbolFromResources(symbolType: String, width: Double, height: Double): Pane? {
         val resourcePath = "/symbols/${symbolType}.svg"
         val inputStream = javaClass.getResourceAsStream(resourcePath) ?: return null
-        
+
         return try {
             val svgContent = inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             val pane = parser.parse(svgContent)
@@ -199,7 +204,7 @@ class SymbolLibrary private constructor(
             null
         }
     }
-    
+
     /**
      * Создаёт fallback Pane с размерами из конфига.
      */
@@ -207,10 +212,10 @@ class SymbolLibrary private constructor(
         val definition = config.symbols[symbolType]
         val width = definition?.width ?: 80.0
         val height = definition?.height ?: 40.0
-        
+
         // Создаём пустой SVGDocument для userData
         val emptyDoc = parser.createEmptySVGDocument(width.toFloat(), height.toFloat())
-        
+
         return Pane().apply {
             prefWidth = width
             prefHeight = height
@@ -218,7 +223,7 @@ class SymbolLibrary private constructor(
             userData = emptyDoc  // Для совместимости с ComponentRenderer
         }
     }
-    
+
     /**
      * Очищает кэш (для отладки).
      */
