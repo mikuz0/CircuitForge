@@ -38,6 +38,7 @@ class BomWindow : ProjectAware {
     private val deleteButton = Button(I18n.tr("bom.btn.delete") ?: "Удалить")
     private val saveButton = Button(I18n.tr("bom.btn.save") ?: "Сохранить")
     private val revertButton = Button(I18n.tr("bom.btn.revert") ?: "Отменить")
+    private val syncButton = Button(I18n.tr("bom.btn.sync") ?: "Синхронизировать")
     private val closeButton = Button(I18n.tr("bom.btn.close") ?: "Закрыть")
     private val statusLabel = Label("")
 
@@ -61,7 +62,7 @@ class BomWindow : ProjectAware {
     }
 
     private fun createToolbar(): HBox {
-        return HBox(10.0, addButton, duplicateButton, deleteButton, closeButton).apply {
+        return HBox(10.0, addButton, duplicateButton, deleteButton, syncButton, closeButton).apply {
             alignment = Pos.CENTER_LEFT
             padding = Insets(8.0)
             style = "-fx-background-color: #f5f5f5; -fx-border-color: #ddd; -fx-border-width: 0 0 1 0;"
@@ -72,6 +73,7 @@ class BomWindow : ProjectAware {
         addButton.setOnAction { showAddItemDialog() }
         duplicateButton.setOnAction { duplicateRow() }
         deleteButton.setOnAction { deleteRow() }
+        syncButton.setOnAction { syncBom() }
         saveButton.setOnAction { saveBom() }
         revertButton.setOnAction { revertChanges() }
         closeButton.setOnAction { stage.close() }
@@ -183,7 +185,13 @@ class BomWindow : ProjectAware {
         val componentCol = TableColumn<BomRow, String>("Компонент")
         componentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.componentName) }
         componentCol.isEditable = false
-        componentCol.prefWidth = 250.0
+        componentCol.prefWidth = 200.0
+
+        // Колонка Description (readonly)
+        val descriptionCol = TableColumn<BomRow, String>("Описание")
+        descriptionCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.description) }
+        descriptionCol.isEditable = false
+        descriptionCol.prefWidth = 200.0
 
         // Колонка Comment (редактируемая)
         val commentCol = TableColumn<BomRow, String>("Комментарий")
@@ -239,7 +247,7 @@ class BomWindow : ProjectAware {
             }
         }
 
-        tableView.columns.setAll(numberCol, refDesCol, componentCol, commentCol)
+        tableView.columns.setAll(numberCol, refDesCol, componentCol, descriptionCol, commentCol)
         tableView.items = bomRows
     }
 
@@ -272,6 +280,7 @@ class BomWindow : ProjectAware {
                 componentId = selectedComponent.componentId,
                 componentSlug = selectedComponent.componentSlug,
                 componentName = selectedComponent.componentName,
+                description = selectedComponent.description,
                 comment = selectedComponent.comment,
                 refPrefix = prefix
             )
@@ -299,6 +308,51 @@ class BomWindow : ProjectAware {
         )
         bomRows.add(dup)
         markDirty()
+    }
+
+    private fun syncBom() {
+        val paths = projectPaths ?: return
+        val task = object : javafx.concurrent.Task<Unit>() {
+            override fun call() {
+                projectPaths?.let { paths ->
+                    val componentsMap = mutableMapOf<String, Component>()
+                    bomRows.forEach { row ->
+                        try {
+                            val comp = ComponentRepository.loadComponentById(paths.projectDir, row.componentId)
+                            if (comp != null) {
+                                componentsMap[row.componentId] = comp
+                            }
+                        } catch (e: Exception) {
+                            logger.warn("Failed to load component for row ${row.refDes}", e)
+                        }
+                    }
+
+                    val updatedRows = bomRows.map { row ->
+                        val comp = componentsMap[row.componentId]
+                        if (comp != null) {
+                            val description = comp.description
+                            val comment = comp.mainProperties.joinToString(", ") { "${it.key}: ${it.value}" }
+                            row.copy(description = description, comment = comment)
+                        } else row
+                    }
+
+                    javafx.application.Platform.runLater {
+                        bomRows.setAll(updatedRows)
+                        markDirty()
+                        logger.info("BOM synchronized: ${updatedRows.size} items")
+                    }
+                }
+            }
+        }
+        task.setOnSucceeded {
+            statusLabel.text = "Синхронизировано"
+            statusLabel.style = "-fx-text-fill: green;"
+        }
+        task.setOnFailed {
+            UiUtils.errorAlert("Ошибка", task.exception?.message ?: "Unknown error")
+            logger.error("Failed to sync BOM", task.exception)
+        }
+        executor.submit(task)
     }
 
     private fun deleteRow() {
@@ -332,6 +386,7 @@ class BomWindow : ProjectAware {
                             refDes = row.refDes,
                             componentId = row.componentId,
                             componentSlug = row.componentSlug,
+                            description = row.description,
                             comment = row.comment
                         )
                     }

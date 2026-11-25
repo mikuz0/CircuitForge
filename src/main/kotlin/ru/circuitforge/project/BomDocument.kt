@@ -23,6 +23,7 @@ data class BomItem(
     val refDes: String = "",
     val componentId: String = "",
     val componentSlug: String = "",
+    val description: String = "",
     val comment: String = ""
 )
 
@@ -37,6 +38,7 @@ data class BomRow(
     val componentId: String,
     val componentSlug: String = "",
     val componentName: String,
+    val description: String = "",
     val comment: String,
     val refPrefix: String = ""
 )
