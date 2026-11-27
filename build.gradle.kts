@@ -4,6 +4,7 @@ plugins {
     id("application")
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
     id("org.jlleitschuh.gradle.ktlint") version "12.3.0"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
 group = "ru.circuitforge"
@@ -43,12 +44,13 @@ kotlin {
 
 javafx {
     version = "21.0.9"
-    modules = listOf(
-        "javafx.controls",
-        "javafx.fxml",
-        "javafx.swing",
-        "javafx.web"
-    )
+    modules =
+        listOf(
+            "javafx.controls",
+            "javafx.fxml",
+            "javafx.swing",
+            "javafx.web",
+        )
 }
 
 application {
@@ -114,15 +116,15 @@ tasks.register("generateExtraScripts") {
         val content = mainScript.readText()
         val oldLine = "        ru.circuitforge.app.MainApp \\"
 
-        val modules = listOf(
-            "Bom" to bomMainClass,
-            "Net" to netMainClass,
-            "Components" to componentsMainClass
-        )
+        val modules =
+            listOf(
+                "Bom" to bomMainClass,
+                "Net" to netMainClass,
+                "Components" to componentsMainClass,
+            )
 
         for ((name, mc) in modules) {
             val mainClassLine = "        ru.circuitforge.app.MainApp \\".replace("ru.circuitforge.app.MainApp", mc)
-
 
             // Copy and replace main class in shell script
             val shellContent = content.replace(oldLine, mainClassLine)
@@ -131,15 +133,14 @@ tasks.register("generateExtraScripts") {
             outFile.writeText(shellContent)
             outFile.setExecutable(true, false)
 
-
             // Copy and replace main class in batch script
             if (mainBat.exists()) {
-                val batContent = mainBat.readText()
-                    .replace("ru.circuitforge.app.MainApp", mc)
+                val batContent =
+                    mainBat.readText()
+                        .replace("ru.circuitforge.app.MainApp", mc)
                 val batFile = File(scriptsDirFile, "CircuitForge$name.bat")
                 batFile.parentFile.mkdirs()
                 batFile.writeText(batContent)
-
             }
         }
     }

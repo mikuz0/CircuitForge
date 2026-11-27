@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory
 import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.UiUtils
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -23,7 +22,7 @@ import java.nio.file.Path
  */
 data class ComponentSearchResult(
     val component: Component,
-    val matchFields: List<String>
+    val matchFields: List<String>,
 )
 
 /**
@@ -35,7 +34,7 @@ data class ComponentSearchResult(
 class AddBomItemDialog(
     ownerStage: Stage,
     private val projectDir: Path,
-    private val onConfirm: (BomRow) -> Unit
+    private val onConfirm: (BomRow) -> Unit,
 ) {
     private val logger = LoggerFactory.getLogger(AddBomItemDialog::class.java)
 
@@ -78,7 +77,7 @@ class AddBomItemDialog(
             if (summaries.isEmpty()) {
                 UiUtils.errorAlert(
                     I18n.tr("common.alert.error") ?: "Ошибка",
-                    I18n.tr("bom.dialog.add.no.components") ?: "В проекте нет компонентов. Создайте их в редакторе компонентов."
+                    I18n.tr("bom.dialog.add.no.components") ?: "В проекте нет компонентов. Создайте их в редакторе компонентов.",
                 )
                 stage.close()
                 return
@@ -100,7 +99,7 @@ class AddBomItemDialog(
             logger.error("Failed to load components from $projectDir", e)
             UiUtils.errorAlert(
                 I18n.tr("common.alert.error") ?: "Ошибка",
-                I18n.tr("bom.dialog.add.load.error") ?: "Не удалось загрузить компоненты: ${e.message}"
+                I18n.tr("bom.dialog.add.load.error") ?: "Не удалось загрузить компоненты: ${e.message}",
             )
             stage.close()
         }
@@ -114,7 +113,10 @@ class AddBomItemDialog(
     }
 
     /** Найти поля, в которых совпал запрос. */
-    private fun findMatches(comp: Component, query: String): List<String> {
+    private fun findMatches(
+        comp: Component,
+        query: String,
+    ): List<String> {
         val matches = mutableListOf<String>()
         val q = query.lowercase()
 
@@ -165,29 +167,36 @@ class AddBomItemDialog(
     private fun applySearchAndFilters() {
         val query = searchField.text.trim()
 
-        val searched = if (query.isEmpty()) {
-            allComponents.map { comp -> ComponentSearchResult(comp, emptyList()) }
-        } else {
-            allComponents.mapNotNull { comp ->
-                val searchString = searchStrings[comp] ?: return@mapNotNull null
-                if (searchString.contains(query.lowercase())) {
-                    val matches = findMatches(comp, query)
-                    ComponentSearchResult(comp, matches)
-                } else null
-            }
-        }
-
-        // Вторичная фильтрация по свойствам
-        val filtered = if (filterValues.isEmpty()) {
-            searched
-        } else {
-            searched.filter { result ->
-                filterValues.all { (key, value) ->
-                    if (value.isNullOrBlank()) true
-                    else result.component.mainProperties.any { it.key == key && it.value.lowercase().contains(value.lowercase()) }
+        val searched =
+            if (query.isEmpty()) {
+                allComponents.map { comp -> ComponentSearchResult(comp, emptyList()) }
+            } else {
+                allComponents.mapNotNull { comp ->
+                    val searchString = searchStrings[comp] ?: return@mapNotNull null
+                    if (searchString.contains(query.lowercase())) {
+                        val matches = findMatches(comp, query)
+                        ComponentSearchResult(comp, matches)
+                    } else {
+                        null
+                    }
                 }
             }
-        }
+
+        // Вторичная фильтрация по свойствам
+        val filtered =
+            if (filterValues.isEmpty()) {
+                searched
+            } else {
+                searched.filter { result ->
+                    filterValues.all { (key, value) ->
+                        if (value.isNullOrBlank()) {
+                            true
+                        } else {
+                            result.component.mainProperties.any { it.key == key && it.value.lowercase().contains(value.lowercase()) }
+                        }
+                    }
+                }
+            }
 
         resultsList.setAll(filtered)
 
@@ -229,21 +238,29 @@ class AddBomItemDialog(
         val propsCol = TableColumn<ComponentSearchResult, String>(I18n.tr("bom.dialog.add.col.mainProps") ?: "Основные свойства")
         propsCol.setCellValueFactory { cell ->
             val props = cell.value.component.mainProperties
-            val text = if (props.isEmpty()) {
-                I18n.tr("bom.dialog.add.col.no.props") ?: "—"
-            } else {
-                props.joinToString(", ") {
-                    if (it.unit.isNotBlank()) "${it.key}: ${it.value} ${it.unit}"
-                    else "${it.key}: ${it.value}"
+            val text =
+                if (props.isEmpty()) {
+                    I18n.tr("bom.dialog.add.col.no.props") ?: "—"
+                } else {
+                    props.joinToString(", ") {
+                        if (it.unit.isNotBlank()) {
+                            "${it.key}: ${it.value} ${it.unit}"
+                        } else {
+                            "${it.key}: ${it.value}"
+                        }
+                    }
                 }
-            }
             javafx.beans.property.SimpleStringProperty(text)
         }
         propsCol.prefWidth = 300.0
         propsCol.setCellFactory {
             object : TableCell<ComponentSearchResult, String>() {
                 private val tooltip = Tooltip()
-                override fun updateItem(item: String?, empty: Boolean) {
+
+                override fun updateItem(
+                    item: String?,
+                    empty: Boolean,
+                ) {
                     super.updateItem(item, empty)
                     if (empty || item == null) {
                         text = null
@@ -254,10 +271,14 @@ class AddBomItemDialog(
                         graphic = null
                         val comp = tableRow.item?.component
                         if (comp != null && comp.mainProperties.isNotEmpty()) {
-                            tooltip.text = comp.mainProperties.joinToString("\n") {
-                                if (it.unit.isNotBlank()) "${it.key}: ${it.value} ${it.unit}"
-                                else "${it.key}: ${it.value}"
-                            }
+                            tooltip.text =
+                                comp.mainProperties.joinToString("\n") {
+                                    if (it.unit.isNotBlank()) {
+                                        "${it.key}: ${it.value} ${it.unit}"
+                                    } else {
+                                        "${it.key}: ${it.value}"
+                                    }
+                                }
                         }
                     }
                 }
@@ -280,14 +301,15 @@ class AddBomItemDialog(
         resultsTable.columns.setAll(nameCol, prefixCol, descCol, propsCol, portsCol, matchCol)
 
         // Двойной клик → добавить
-        resultsTable.onMouseClicked = javafx.event.EventHandler { event ->
-            if (event.button == MouseButton.PRIMARY && event.clickCount == 2) {
-                val selection = resultsTable.selectionModel.selectedItem
-                if (selection != null) {
-                    confirmSelection(selection)
+        resultsTable.onMouseClicked =
+            javafx.event.EventHandler { event ->
+                if (event.button == MouseButton.PRIMARY && event.clickCount == 2) {
+                    val selection = resultsTable.selectionModel.selectedItem
+                    if (selection != null) {
+                        confirmSelection(selection)
+                    }
                 }
             }
-        }
 
         // Выбор строки → перестроить панель фильтров
         resultsTable.selectionModel.selectedItemProperty().addListener { _, _, _ ->
@@ -314,27 +336,30 @@ class AddBomItemDialog(
             val key = prop.key
             val uniqueValues = getUniqueValuesForKey(key)
 
-            val labelRow = HBox(8.0, Label("${key}:")).apply {
-                alignment = Pos.CENTER_LEFT
-                style = "-fx-font-weight: bold;"
-            }
+            val labelRow =
+                HBox(8.0, Label("$key:")).apply {
+                    alignment = Pos.CENTER_LEFT
+                    style = "-fx-font-weight: bold;"
+                }
 
-            val combo = ComboBox<String>().apply {
-                isEditable = true
-                promptText = I18n.tr("bom.dialog.add.filter.all") ?: "Все"
-                if (uniqueValues.isNotEmpty()) {
-                    items.setAll(uniqueValues)
+            val combo =
+                ComboBox<String>().apply {
+                    isEditable = true
+                    promptText = I18n.tr("bom.dialog.add.filter.all") ?: "Все"
+                    if (uniqueValues.isNotEmpty()) {
+                        items.setAll(uniqueValues)
+                    }
+                    valueProperty().addListener { _, _, _ ->
+                        filterValues[key] = this.value
+                        applySearchAndFilters()
+                    }
                 }
-                valueProperty().addListener { _, _, _ ->
-                    filterValues[key] = this.value
-                    applySearchAndFilters()
-                }
-            }
             filterComboBoxes[key] = combo
 
-            val filterRow = HBox(8.0, labelRow, combo).apply {
-                alignment = Pos.CENTER_LEFT
-            }
+            val filterRow =
+                HBox(8.0, labelRow, combo).apply {
+                    alignment = Pos.CENTER_LEFT
+                }
 
             filterPane.children.add(filterRow)
         }
@@ -362,18 +387,20 @@ class AddBomItemDialog(
 
         // Escape → закрыть
         stage.sceneProperty().addListener { _, _, scene ->
-            scene?.onKeyReleased = javafx.event.EventHandler { event ->
-                if (event.code == KeyCode.ESCAPE) {
-                    stage.close()
-                    event.consume()
+            scene?.onKeyReleased =
+                javafx.event.EventHandler { event ->
+                    if (event.code == KeyCode.ESCAPE) {
+                        stage.close()
+                        event.consume()
+                    }
                 }
-            }
         }
     }
 
     private fun updateStatus() {
-        statusLabel.text = I18n.tr("bom.dialog.add.found", resultsList.size)
-            .replace("{0}", resultsList.size.toString())
+        statusLabel.text =
+            I18n.tr("bom.dialog.add.found", resultsList.size)
+                .replace("{0}", resultsList.size.toString())
     }
 
     private fun updateAddButtonState() {
@@ -387,16 +414,17 @@ class AddBomItemDialog(
     private fun confirmSelection(result: ComponentSearchResult) {
         val comp = result.component
 
-        val newRow = BomRow(
-            bomnetId = java.util.UUID.randomUUID().toString(),
-            number = 0,
-            refDes = "",
-            componentId = comp.id,
-            componentSlug = ComponentRepository.generateSlug(comp.name),
-            componentName = comp.name,
-            comment = comp.mainProperties.firstOrNull { it.key.equals("Номинал", ignoreCase = true) }?.value ?: "",
-            refPrefix = comp.refPrefix.uppercase()
-        )
+        val newRow =
+            BomRow(
+                bomnetId = java.util.UUID.randomUUID().toString(),
+                number = 0,
+                refDes = "",
+                componentId = comp.id,
+                componentSlug = ComponentRepository.generateSlug(comp.name),
+                componentName = comp.name,
+                comment = comp.mainProperties.firstOrNull { it.key.equals("Номинал", ignoreCase = true) }?.value ?: "",
+                refPrefix = comp.refPrefix.uppercase(),
+            )
 
         onConfirm(newRow)
         stage.close()
@@ -408,30 +436,33 @@ class AddBomItemDialog(
         val root = BorderPane()
 
         // Top: search bar
-        val searchBar = HBox(10.0, searchField, clearButton).apply {
-            alignment = Pos.CENTER_LEFT
-            padding = Insets(10.0)
-            style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 0 0 1 0;"
-        }
+        val searchBar =
+            HBox(10.0, searchField, clearButton).apply {
+                alignment = Pos.CENTER_LEFT
+                padding = Insets(10.0)
+                style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 0 0 1 0;"
+            }
         root.top = searchBar
 
         // Center: table + filter panel
         val center = VBox(0.0)
-        val scrollPane = ScrollPane(resultsTable).apply {
-            hbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
-            vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
-            isFitToWidth = true
-        }
+        val scrollPane =
+            ScrollPane(resultsTable).apply {
+                hbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
+                vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
+                isFitToWidth = true
+            }
         center.children.add(scrollPane)
         center.children.add(filterPane)
         root.center = center
 
         // Bottom: status + buttons
-        val bottomBar = HBox(10.0, statusLabel, Region(), addButton, cancelButton).apply {
-            alignment = Pos.CENTER_LEFT
-            padding = Insets(10.0)
-            style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
-        }
+        val bottomBar =
+            HBox(10.0, statusLabel, Region(), addButton, cancelButton).apply {
+                alignment = Pos.CENTER_LEFT
+                padding = Insets(10.0)
+                style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
+            }
         root.bottom = bottomBar
 
         return root

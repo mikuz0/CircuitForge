@@ -14,22 +14,24 @@ import java.nio.file.Files
 @Serializable
 data class Settings(
     val workspace: String? = null,
-    val locale: String = I18n.LocaleType.EN.name
+    val locale: String = I18n.LocaleType.EN.name,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(Settings::class.java)
-        private val json = Json {
-            prettyPrint = true
-            ignoreUnknownKeys = true
-        }
+        private val json =
+            Json {
+                prettyPrint = true
+                ignoreUnknownKeys = true
+            }
     }
 
     /** Получить текущий язык. */
-    fun getLocale(): I18n.LocaleType = try {
-        I18n.LocaleType.valueOf(locale)
-    } catch (e: Exception) {
-        I18n.LocaleType.EN
-    }
+    fun getLocale(): I18n.LocaleType =
+        try {
+            I18n.LocaleType.valueOf(locale)
+        } catch (e: Exception) {
+            I18n.LocaleType.EN
+        }
 
     /** Создать копию с новым языком. */
     fun withLocale(locale: I18n.LocaleType): Settings = copy(locale = locale.name)
@@ -41,10 +43,11 @@ data class Settings(
  */
 object SettingsStore {
     private val logger = LoggerFactory.getLogger(SettingsStore::class.java)
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     /** Загружает настройки из файла. Возвращает дефолтные при ошибке. */
     fun load(): Settings {

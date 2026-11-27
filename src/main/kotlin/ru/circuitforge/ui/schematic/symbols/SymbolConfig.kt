@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SymbolConfig(
     val symbols: Map<String, SymbolDefinition> = emptyMap(),
-    val mappings: Map<String, String> = emptyMap()
+    val mappings: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -17,10 +17,10 @@ data class SymbolConfig(
  */
 @Serializable
 data class SymbolDefinition(
-    val file: String,              // имя SVG файла (относительно symbolsDir)
-    val width: Double = 80.0,      // ширина символа
-    val height: Double = 40.0,     // высота символа
-    val ports: Map<String, PortDefinition> = emptyMap()  // pinNumber → позиция
+    val file: String, // имя SVG файла (относительно symbolsDir)
+    val width: Double = 80.0, // ширина символа
+    val height: Double = 40.0, // высота символа
+    val ports: Map<String, PortDefinition> = emptyMap(), // pinNumber → позиция
 )
 
 /**
@@ -29,5 +29,5 @@ data class SymbolDefinition(
 @Serializable
 data class PortDefinition(
     val x: Double = 0.0,
-    val y: Double = 0.0
+    val y: Double = 0.0,
 )

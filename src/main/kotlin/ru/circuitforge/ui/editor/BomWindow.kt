@@ -22,9 +22,10 @@ import java.util.concurrent.Executors
 class BomWindow : ProjectAware {
     private val logger = LoggerFactory.getLogger(BomWindow::class.java)
     private val stage = Stage()
-    private val executor = Executors.newFixedThreadPool(2) { r ->
-        Thread(r, "bom-io").apply { isDaemon = true }
-    }
+    private val executor =
+        Executors.newFixedThreadPool(2) { r ->
+            Thread(r, "bom-io").apply { isDaemon = true }
+        }
 
     private var projectPaths: ProjectPaths? = null
 
@@ -51,11 +52,12 @@ class BomWindow : ProjectAware {
         val root = BorderPane()
         root.top = createToolbar()
         root.center = tableView
-        root.bottom = HBox(10.0, saveButton, revertButton, statusLabel).apply {
-            alignment = Pos.CENTER_LEFT
-            padding = Insets(8.0)
-            style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
-        }
+        root.bottom =
+            HBox(10.0, saveButton, revertButton, statusLabel).apply {
+                alignment = Pos.CENTER_LEFT
+                padding = Insets(8.0)
+                style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
+            }
         return root
     }
 
@@ -90,46 +92,54 @@ class BomWindow : ProjectAware {
         val refDesCol = TableColumn<BomRow, String>("Поз. обозначение")
         refDesCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refDes) }
         refDesCol.prefWidth = 150.0
-        refDesCol.cellFactory = javafx.util.Callback { _ ->
-            object : TableCell<BomRow, String>() {
-                private val textField = TextField()
-                init {
-                    textField.setOnAction {
-                        commitEdit(textField.text)
+        refDesCol.cellFactory =
+            javafx.util.Callback { _ ->
+                object : TableCell<BomRow, String>() {
+                    private val textField = TextField()
+
+                    init {
+                        textField.setOnAction {
+                            commitEdit(textField.text)
+                        }
+                        textField.focusedProperty().addListener { _, _, isFocused ->
+                            if (!isFocused) commitEdit(textField.text)
+                        }
                     }
-                    textField.focusedProperty().addListener { _, _, isFocused ->
-                        if (!isFocused) commitEdit(textField.text)
-                    }
-                }
-                override fun startEdit() {
-                    super.startEdit()
-                    textField.text = item ?: ""
-                    graphic = textField
-                    text = null
-                    textField.requestFocus()
-                    textField.selectAll()
-                }
-                override fun cancelEdit() {
-                    super.cancelEdit()
-                    text = item
-                    graphic = null
-                }
-                override fun updateItem(item: String?, empty: Boolean) {
-                    super.updateItem(item, empty)
-                    if (empty || item == null) {
-                        text = null
-                        graphic = null
-                    } else if (isEditing) {
-                        textField.text = item
+
+                    override fun startEdit() {
+                        super.startEdit()
+                        textField.text = item ?: ""
                         graphic = textField
                         text = null
-                    } else {
+                        textField.requestFocus()
+                        textField.selectAll()
+                    }
+
+                    override fun cancelEdit() {
+                        super.cancelEdit()
                         text = item
                         graphic = null
                     }
+
+                    override fun updateItem(
+                        item: String?,
+                        empty: Boolean,
+                    ) {
+                        super.updateItem(item, empty)
+                        if (empty || item == null) {
+                            text = null
+                            graphic = null
+                        } else if (isEditing) {
+                            textField.text = item
+                            graphic = textField
+                            text = null
+                        } else {
+                            text = item
+                            graphic = null
+                        }
+                    }
                 }
             }
-        }
         refDesCol.setOnEditCommit { event ->
             val row = event.rowValue
             val newRefDes = event.newValue?.trim() ?: ""
@@ -145,7 +155,7 @@ class BomWindow : ProjectAware {
                 if (row.refPrefix.isNotBlank()) {
                     UiUtils.errorAlert(
                         I18n.tr("common.alert.error") ?: "Ошибка",
-                        "Поз. обозначение должно содержать префикс '" + row.refPrefix + "' и номер."
+                        "Поз. обозначение должно содержать префикс '" + row.refPrefix + "' и номер.",
                     )
                     tableView.refresh()
                     return@setOnEditCommit
@@ -155,7 +165,7 @@ class BomWindow : ProjectAware {
                 if (extractedPrefix != row.refPrefix) {
                     UiUtils.errorAlert(
                         I18n.tr("common.alert.error") ?: "Ошибка",
-                        "Префикс должен быть '" + row.refPrefix + "', а не '" + extractedPrefix + "'."
+                        "Префикс должен быть '" + row.refPrefix + "', а не '" + extractedPrefix + "'.",
                     )
                     tableView.refresh()
                     return@setOnEditCommit
@@ -166,7 +176,7 @@ class BomWindow : ProjectAware {
             if (bomRows.map { it.refDes }.filter { it != row.refDes }.contains(newRefDes)) {
                 UiUtils.errorAlert(
                     I18n.tr("common.alert.error") ?: "Ошибка",
-                    "Поз. обозначение '" + newRefDes + "' уже существует."
+                    "Поз. обозначение '" + newRefDes + "' уже существует.",
                 )
                 tableView.refresh()
                 return@setOnEditCommit
@@ -195,46 +205,54 @@ class BomWindow : ProjectAware {
         val commentCol = TableColumn<BomRow, String>("Комментарий")
         commentCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.comment) }
         commentCol.prefWidth = 300.0
-        commentCol.cellFactory = javafx.util.Callback { _ ->
-            object : TableCell<BomRow, String>() {
-                private val textField = TextField()
-                init {
-                    textField.setOnAction {
-                        commitEdit(textField.text)
+        commentCol.cellFactory =
+            javafx.util.Callback { _ ->
+                object : TableCell<BomRow, String>() {
+                    private val textField = TextField()
+
+                    init {
+                        textField.setOnAction {
+                            commitEdit(textField.text)
+                        }
+                        textField.focusedProperty().addListener { _, _, isFocused ->
+                            if (!isFocused) commitEdit(textField.text)
+                        }
                     }
-                    textField.focusedProperty().addListener { _, _, isFocused ->
-                        if (!isFocused) commitEdit(textField.text)
-                    }
-                }
-                override fun startEdit() {
-                    super.startEdit()
-                    textField.text = item ?: ""
-                    graphic = textField
-                    text = null
-                    textField.requestFocus()
-                    textField.selectAll()
-                }
-                override fun cancelEdit() {
-                    super.cancelEdit()
-                    text = item
-                    graphic = null
-                }
-                override fun updateItem(item: String?, empty: Boolean) {
-                    super.updateItem(item, empty)
-                    if (empty || item == null) {
-                        text = null
-                        graphic = null
-                    } else if (isEditing) {
-                        textField.text = item
+
+                    override fun startEdit() {
+                        super.startEdit()
+                        textField.text = item ?: ""
                         graphic = textField
                         text = null
-                    } else {
+                        textField.requestFocus()
+                        textField.selectAll()
+                    }
+
+                    override fun cancelEdit() {
+                        super.cancelEdit()
                         text = item
                         graphic = null
                     }
+
+                    override fun updateItem(
+                        item: String?,
+                        empty: Boolean,
+                    ) {
+                        super.updateItem(item, empty)
+                        if (empty || item == null) {
+                            text = null
+                            graphic = null
+                        } else if (isEditing) {
+                            textField.text = item
+                            graphic = textField
+                            text = null
+                        } else {
+                            text = item
+                            graphic = null
+                        }
+                    }
                 }
             }
-        }
         commentCol.setOnEditCommit { event ->
             val row = event.rowValue
             val newComment = event.newValue?.trim() ?: ""
@@ -255,7 +273,7 @@ class BomWindow : ProjectAware {
         if (summaries.isEmpty()) {
             UiUtils.errorAlert(
                 I18n.tr("common.alert.error") ?: "Ошибка",
-                I18n.tr("bom.dialog.add.no.components") ?: "В проекте нет компонентов. Создайте их в редакторе компонентов."
+                I18n.tr("bom.dialog.add.no.components") ?: "В проекте нет компонентов. Создайте их в редакторе компонентов.",
             )
             return
         }
@@ -263,25 +281,29 @@ class BomWindow : ProjectAware {
         AddBomItemDialog(stage, paths.projectDir) { selectedComponent ->
             // Генерация RefDes: prefix + maxNum + 1
             val prefix = selectedComponent.refPrefix.uppercase()
-            val existingNums = bomRows.mapNotNull { row ->
-                if (row.refDes.startsWith(prefix)) {
-                    row.refDes.removePrefix(prefix).toIntOrNull()
-                } else null
-            }
+            val existingNums =
+                bomRows.mapNotNull { row ->
+                    if (row.refDes.startsWith(prefix)) {
+                        row.refDes.removePrefix(prefix).toIntOrNull()
+                    } else {
+                        null
+                    }
+                }
             val maxNum = existingNums.maxOrNull() ?: 0
             val newRefDes = "$prefix${maxNum + 1}"
 
-            val newRow = BomRow(
-                bomnetId = UUID.randomUUID().toString(),
-                number = 0, // Пересчитается при сохранении
-                refDes = newRefDes,
-                componentId = selectedComponent.componentId,
-                componentSlug = selectedComponent.componentSlug,
-                componentName = selectedComponent.componentName,
-                description = selectedComponent.description,
-                comment = selectedComponent.comment,
-                refPrefix = prefix
-            )
+            val newRow =
+                BomRow(
+                    bomnetId = UUID.randomUUID().toString(),
+                    number = 0, // Пересчитается при сохранении
+                    refDes = newRefDes,
+                    componentId = selectedComponent.componentId,
+                    componentSlug = selectedComponent.componentSlug,
+                    componentName = selectedComponent.componentName,
+                    description = selectedComponent.description,
+                    comment = selectedComponent.comment,
+                    refPrefix = prefix,
+                )
             bomRows.add(newRow)
             markDirty()
             logger.info("Added BOM item: $newRefDes (${selectedComponent.componentName})")
@@ -291,57 +313,65 @@ class BomWindow : ProjectAware {
     private fun duplicateRow() {
         val selected = tableView.selectionModel.selectedItem ?: return
         val prefix = selected.refPrefix
-        val existingNums = bomRows.mapNotNull { row ->
-            if (row.refDes.startsWith(prefix)) {
-                row.refDes.removePrefix(prefix).toIntOrNull()
-            } else null
-        }
+        val existingNums =
+            bomRows.mapNotNull { row ->
+                if (row.refDes.startsWith(prefix)) {
+                    row.refDes.removePrefix(prefix).toIntOrNull()
+                } else {
+                    null
+                }
+            }
         val maxNum = existingNums.maxOrNull() ?: 0
         val newRefDes = "$prefix${maxNum + 1}"
 
-        val dup = selected.copy(
-            bomnetId = UUID.randomUUID().toString(),
-            refDes = newRefDes,
-            number = 0
-        )
+        val dup =
+            selected.copy(
+                bomnetId = UUID.randomUUID().toString(),
+                refDes = newRefDes,
+                number = 0,
+            )
         bomRows.add(dup)
         markDirty()
     }
 
     private fun syncBom() {
         val paths = projectPaths ?: return
-        val task = object : javafx.concurrent.Task<Unit>() {
-            override fun call() {
-                projectPaths?.let { paths ->
-                    val componentsMap = mutableMapOf<String, Component>()
-                    bomRows.forEach { row ->
-                        try {
-                            val comp = ComponentRepository.loadComponentById(paths.projectDir, row.componentId)
-                            if (comp != null) {
-                                componentsMap[row.componentId] = comp
+        val task =
+            object : javafx.concurrent.Task<Unit>() {
+                override fun call() {
+                    projectPaths?.let { paths ->
+                        val componentsMap = mutableMapOf<String, Component>()
+                        bomRows.forEach { row ->
+                            try {
+                                val comp = ComponentRepository.loadComponentById(paths.projectDir, row.componentId)
+                                if (comp != null) {
+                                    componentsMap[row.componentId] = comp
+                                }
+                            } catch (e: Exception) {
+                                logger.warn("Failed to load component for row ${row.refDes}", e)
                             }
-                        } catch (e: Exception) {
-                            logger.warn("Failed to load component for row ${row.refDes}", e)
                         }
-                    }
 
-                    val updatedRows = bomRows.map { row ->
-                        val comp = componentsMap[row.componentId]
-                        if (comp != null) {
-                            val description = comp.description
-                            val comment = comp.mainProperties.joinToString(", ") { "${it.key}: ${it.value}" }
-                            row.copy(description = description, comment = comment)
-                        } else row
-                    }
+                        val updatedRows =
+                            bomRows.map { row ->
+                                val comp = componentsMap[row.componentId]
+                                if (comp != null) {
+                                    val description = comp.description
+                                    val comment = comp.mainProperties.joinToString(", ") { "${it.key}: ${it.value}" }
+                                    row.copy(description = description, comment = comment)
+                                } else {
+                                    row
+                                }
+                            }
 
-                    javafx.application.Platform.runLater {
-                        bomRows.setAll(updatedRows)
-                        markDirty()
-                        logger.info("BOM synchronized: ${updatedRows.size} items")
+                        javafx.application.Platform.runLater {
+                            bomRows.setAll(updatedRows)
+                            markDirty()
+                            logger.info("BOM synchronized: ${updatedRows.size} items")
+                        }
                     }
                 }
             }
-        }
         task.setOnSucceeded {
             statusLabel.text = "Синхронизировано"
             statusLabel.style = "-fx-text-fill: green;"
@@ -374,24 +404,26 @@ class BomWindow : ProjectAware {
         // Перенумерация #
         val numberedRows = bomRows.mapIndexed { index, row -> row.copy(number = index + 1) }
 
-        val task = object : javafx.concurrent.Task<Unit>() {
-            override fun call() {
-                projectPaths?.let { paths ->
-                    val items = numberedRows.map { row ->
-                        BomItem(
-                            bomnetId = row.bomnetId,
-                            number = row.number,
-                            refDes = row.refDes,
-                            componentId = row.componentId,
-                            componentSlug = row.componentSlug,
-                            description = row.description,
-                            comment = row.comment
-                        )
+        val task =
+            object : javafx.concurrent.Task<Unit>() {
+                override fun call() {
+                    projectPaths?.let { paths ->
+                        val items =
+                            numberedRows.map { row ->
+                                BomItem(
+                                    bomnetId = row.bomnetId,
+                                    number = row.number,
+                                    refDes = row.refDes,
+                                    componentId = row.componentId,
+                                    componentSlug = row.componentSlug,
+                                    description = row.description,
+                                    comment = row.comment,
+                                )
+                            }
+                        BomRepository.save(paths, BomDocument(schemaVersion = 1, items = items))
                     }
-                    BomRepository.save(paths, BomDocument(schemaVersion = 1, items = items))
                 }
             }
-        }
         task.setOnSucceeded {
             statusLabel.text = "Сохранено"
             logger.info("BOM saved")

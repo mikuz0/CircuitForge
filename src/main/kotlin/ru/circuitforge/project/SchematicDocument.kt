@@ -10,7 +10,7 @@ data class SchematicNode(
     val bomnetId: String,
     var x: Double,
     var y: Double,
-    var rotation: Double = 0.0
+    var rotation: Double = 0.0,
 )
 
 /**
@@ -19,5 +19,5 @@ data class SchematicNode(
 @Serializable
 data class SchematicDocument(
     val schemaVersion: Int = 1,
-    val nodes: List<SchematicNode> = emptyList()
+    val nodes: List<SchematicNode> = emptyList(),
 )

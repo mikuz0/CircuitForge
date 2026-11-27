@@ -4,7 +4,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
-import java.nio.file.Path
 
 /**
  * Репозиторий для управления документом схемы (schematic.json).
@@ -12,10 +11,11 @@ import java.nio.file.Path
 object SchematicRepository {
     private val logger = LoggerFactory.getLogger(SchematicRepository::class.java)
     private const val SCHEMATIC_FILE_NAME = "schematic.json"
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     /** Загружает документ схемы. Возвращает пустой при отсутствии. */
     fun load(paths: ProjectPaths): SchematicDocument {
@@ -28,8 +28,12 @@ object SchematicRepository {
             SchematicDocument()
         }
     }
+
     /** Сохраняет документ схемы. */
-    fun save(paths: ProjectPaths, doc: SchematicDocument) {
+    fun save(
+        paths: ProjectPaths,
+        doc: SchematicDocument,
+    ) {
         try {
             val schematicPath = paths.schematic
             Files.createDirectories(schematicPath.parent)

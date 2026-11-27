@@ -1,5 +1,6 @@
 package ru.circuitforge.ui.nets
 
+import javafx.beans.value.ChangeListener
 import javafx.collections.FXCollections
 import javafx.geometry.Insets
 import javafx.geometry.Pos
@@ -15,14 +16,13 @@ import org.slf4j.LoggerFactory
 import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.UiUtils
-import javafx.beans.value.ChangeListener
 
 /**
  * Отображение пина в ComboBox с именем контакта.
  */
 data class PinDisplay(
     val pinNumber: String,
-    val portName: String
+    val portName: String,
 ) {
     override fun toString(): String {
         return if (portName.isNotBlank()) {
@@ -43,7 +43,7 @@ class AddConnectionDialog(
     private val projectPaths: ProjectPaths,
     private val currentNet: Net,
     private val allNets: List<Net>,
-    private val onConfirm: (NetConnection) -> Unit
+    private val onConfirm: (NetConnection) -> Unit,
 ) {
     private val logger = LoggerFactory.getLogger(AddConnectionDialog::class.java)
 
@@ -70,8 +70,9 @@ class AddConnectionDialog(
     init {
         stage.initOwner(ownerStage)
         stage.initModality(Modality.APPLICATION_MODAL)
-        stage.title = I18n.tr("nets.dialog.add.connection.title", currentNet.name)
-            .replace("{0}", currentNet.name)
+        stage.title =
+            I18n.tr("nets.dialog.add.connection.title", currentNet.name)
+                .replace("{0}", currentNet.name)
         loadData()
         setupSearchField()
         setupTable()
@@ -87,7 +88,7 @@ class AddConnectionDialog(
             if (rows.isEmpty()) {
                 UiUtils.errorAlert(
                     I18n.tr("common.alert.error") ?: "Ошибка",
-                    I18n.tr("nets.dialog.add.connection.no.bom") ?: "BOM пуст. Сначала создайте BOM в редакторе."
+                    I18n.tr("nets.dialog.add.connection.no.bom") ?: "BOM пуст. Сначала создайте BOM в редакторе.",
                 )
                 stage.close()
                 return
@@ -102,9 +103,10 @@ class AddConnectionDialog(
                     if (comp != null) {
                         componentsMap[row.componentId] = comp
                         // Создаём PinDisplay для каждого порта
-                        val pinDisplays = comp.ports.map { port ->
-                            PinDisplay(pinNumber = port.pinNumber, portName = port.name)
-                        }
+                        val pinDisplays =
+                            comp.ports.map { port ->
+                                PinDisplay(pinNumber = port.pinNumber, portName = port.name)
+                            }
                         pinOptionsMap[row.refDes] = pinDisplays
                     } else {
                         pinOptionsMap[row.refDes] = emptyList()
@@ -122,7 +124,7 @@ class AddConnectionDialog(
             logger.error("Failed to load data for connection dialog", e)
             UiUtils.errorAlert(
                 I18n.tr("common.alert.error") ?: "Ошибка",
-                I18n.tr("nets.dialog.add.connection.load.error") ?: "Не удалось загрузить данные: ${e.message}"
+                I18n.tr("nets.dialog.add.connection.load.error") ?: "Не удалось загрузить данные: ${e.message}",
             )
             stage.close()
         }
@@ -164,13 +166,14 @@ class AddConnectionDialog(
     private fun applySearch() {
         val query = searchField.text.trim()
 
-        val filtered = if (query.isEmpty()) {
-            bomRows
-        } else {
-            bomRows.filter { row ->
-                searchStrings[row]?.contains(query.lowercase()) == true
+        val filtered =
+            if (query.isEmpty()) {
+                bomRows
+            } else {
+                bomRows.filter { row ->
+                    searchStrings[row]?.contains(query.lowercase()) == true
+                }
             }
-        }
 
         resultsList.setAll(filtered)
         updateStatus()
@@ -207,23 +210,31 @@ class AddConnectionDialog(
         pinCol.isEditable = false
         pinCol.setCellFactory {
             object : TableCell<BomRow, String>() {
-                private val comboBox = ComboBox<PinDisplay>().apply {
-                    isEditable = true
-                    promptText = "—"
-                }
+                private val comboBox =
+                    ComboBox<PinDisplay>().apply {
+                        isEditable = true
+                        promptText = "—"
+                    }
 
                 init {
-                    comboBox.cellFactory = javafx.util.Callback { 
-                        object : ListCell<PinDisplay>() {
-                            override fun updateItem(item: PinDisplay?, empty: Boolean) {
-                                super.updateItem(item, empty)
-                                text = if (empty || item == null) null else item.toString()
+                    comboBox.cellFactory =
+                        javafx.util.Callback {
+                            object : ListCell<PinDisplay>() {
+                                override fun updateItem(
+                                    item: PinDisplay?,
+                                    empty: Boolean,
+                                ) {
+                                    super.updateItem(item, empty)
+                                    text = if (empty || item == null) null else item.toString()
+                                }
                             }
                         }
-                    }
                 }
 
-                override fun updateItem(item: String?, empty: Boolean) {
+                override fun updateItem(
+                    item: String?,
+                    empty: Boolean,
+                ) {
                     super.updateItem(item, empty)
                     if (empty) {
                         graphic = null
@@ -247,10 +258,11 @@ class AddConnectionDialog(
                             comboBox.selectionModel.select(currentPin)
 
                             // Создаём слушатель (при пересоздании ячейки старый listener автоматически detached)
-                            val listener = ChangeListener<PinDisplay> { _, _, newValue ->
-                                selectedPins[refDes] = newValue
-                                updateAddButtonState()
-                            }
+                            val listener =
+                                ChangeListener<PinDisplay> { _, _, newValue ->
+                                    selectedPins[refDes] = newValue
+                                    updateAddButtonState()
+                                }
                             comboBox.selectionModel.selectedItemProperty().addListener(listener)
 
                             graphic = comboBox
@@ -273,36 +285,42 @@ class AddConnectionDialog(
         resultsTable.columns.setAll(refDesCol, componentCol, commentCol, pinCol)
 
         // Подсветка уже добавленных соединений
-        resultsTable.rowFactory = javafx.util.Callback {
-            object : TableRow<BomRow>() {
-                override fun updateItem(row: BomRow?, empty: Boolean) {
-                    super.updateItem(row, empty)
-                    if (empty || row == null) {
-                        style = ""
-                    } else {
-                        // Проверяем, есть ли уже такое соединение в текущей цепи
-                        val isAlreadyConnected = currentNet.connections.any {
-                            it.refDes == row.refDes && it.pinNumber.isNotEmpty()
-                        }
-                        if (isAlreadyConnected) {
-                            style = "-fx-background-color: #f0f0f0;"
-                        } else {
+        resultsTable.rowFactory =
+            javafx.util.Callback {
+                object : TableRow<BomRow>() {
+                    override fun updateItem(
+                        row: BomRow?,
+                        empty: Boolean,
+                    ) {
+                        super.updateItem(row, empty)
+                        if (empty || row == null) {
                             style = ""
+                        } else {
+                            // Проверяем, есть ли уже такое соединение в текущей цепи
+                            val isAlreadyConnected =
+                                currentNet.connections.any {
+                                    it.refDes == row.refDes && it.pinNumber.isNotEmpty()
+                                }
+                            if (isAlreadyConnected) {
+                                style = "-fx-background-color: #f0f0f0;"
+                            } else {
+                                style = ""
+                            }
                         }
                     }
                 }
             }
-        }
 
         // Двойной клик → добавить
-        resultsTable.onMouseClicked = javafx.event.EventHandler { event ->
-            if (event.button == MouseButton.PRIMARY && event.clickCount == 2) {
-                val selection = resultsTable.selectionModel.selectedItem
-                if (selection != null) {
-                    confirmSelection(selection)
+        resultsTable.onMouseClicked =
+            javafx.event.EventHandler { event ->
+                if (event.button == MouseButton.PRIMARY && event.clickCount == 2) {
+                    val selection = resultsTable.selectionModel.selectedItem
+                    if (selection != null) {
+                        confirmSelection(selection)
+                    }
                 }
             }
-        }
     }
 
     // ─── Проверка занятости пина ──────────────────────────────────
@@ -311,7 +329,10 @@ class AddConnectionDialog(
      * Проверяет, используется ли (refDes, pinNumber) в других цепях.
      * Возвращает имя цепи или null.
      */
-    private fun isPinUsedInOtherNet(refDes: String, pinNumber: String): String? {
+    private fun isPinUsedInOtherNet(
+        refDes: String,
+        pinNumber: String,
+    ): String? {
         for (net in allNets) {
             if (net.name == currentNet.name) continue // пропускаем текущую цепь
             if (net.connections.any { it.refDes == refDes && it.pinNumber == pinNumber }) {
@@ -334,18 +355,20 @@ class AddConnectionDialog(
 
         // Escape → закрыть
         stage.sceneProperty().addListener { _, _, scene ->
-            scene?.onKeyReleased = javafx.event.EventHandler { event ->
-                if (event.code == KeyCode.ESCAPE) {
-                    stage.close()
-                    event.consume()
+            scene?.onKeyReleased =
+                javafx.event.EventHandler { event ->
+                    if (event.code == KeyCode.ESCAPE) {
+                        stage.close()
+                        event.consume()
+                    }
                 }
-            }
         }
     }
 
     private fun updateStatus() {
-        statusLabel.text = I18n.tr("nets.dialog.add.connection.found", resultsList.size)
-            .replace("{0}", resultsList.size.toString())
+        statusLabel.text =
+            I18n.tr("nets.dialog.add.connection.found", resultsList.size)
+                .replace("{0}", resultsList.size.toString())
     }
 
     private fun updateAddButtonState() {
@@ -394,27 +417,30 @@ class AddConnectionDialog(
         val root = BorderPane()
 
         // Top: search bar
-        val searchBar = HBox(10.0, searchField, clearButton).apply {
-            alignment = Pos.CENTER_LEFT
-            padding = Insets(10.0)
-            style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 0 0 1 0;"
-        }
+        val searchBar =
+            HBox(10.0, searchField, clearButton).apply {
+                alignment = Pos.CENTER_LEFT
+                padding = Insets(10.0)
+                style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 0 0 1 0;"
+            }
         root.top = searchBar
 
         // Center: table
-        val scrollPane = ScrollPane(resultsTable).apply {
-            hbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
-            vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
-            isFitToWidth = true
-        }
+        val scrollPane =
+            ScrollPane(resultsTable).apply {
+                hbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
+                vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
+                isFitToWidth = true
+            }
         root.center = scrollPane
 
         // Bottom: status + buttons
-        val bottomBar = HBox(10.0, statusLabel, Region(), addButton, cancelButton).apply {
-            alignment = Pos.CENTER_LEFT
-            padding = Insets(10.0)
-            style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
-        }
+        val bottomBar =
+            HBox(10.0, statusLabel, Region(), addButton, cancelButton).apply {
+                alignment = Pos.CENTER_LEFT
+                padding = Insets(10.0)
+                style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
+            }
         root.bottom = bottomBar
 
         return root

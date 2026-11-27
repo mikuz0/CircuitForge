@@ -1,23 +1,17 @@
 package ru.circuitforge.app
 
 import javafx.application.Application
-import javafx.concurrent.Task
-import javafx.geometry.Insets
-import javafx.geometry.Pos
-import javafx.scene.Scene
 import javafx.scene.control.*
 import javafx.scene.layout.*
 import javafx.stage.DirectoryChooser
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
 import ru.circuitforge.i18n.I18n
-import ru.circuitforge.project.ProjectInfo
-import ru.circuitforge.project.ProjectRepository
-import ru.circuitforge.ui.projects.ProjectsController
-import ru.circuitforge.ui.projects.ProjectsView
 import ru.circuitforge.ui.components.ComponentsWindow
 import ru.circuitforge.ui.editor.BomWindow
 import ru.circuitforge.ui.nets.NetWindow
+import ru.circuitforge.ui.projects.ProjectsController
+import ru.circuitforge.ui.projects.ProjectsView
 import ru.circuitforge.ui.schematic.SchematicWindow
 import java.nio.file.Files
 import java.nio.file.Path
@@ -34,9 +28,10 @@ class MainApp : Application() {
 
     // Храним ссылки на окна модулей, чтобы GC не собрал их
     private val moduleWindows = mutableListOf<Stage>()
-    private val executor = Executors.newFixedThreadPool(2) { r ->
-        Thread(r, "project-io").apply { isDaemon = true }
-    }
+    private val executor =
+        Executors.newFixedThreadPool(2) { r ->
+            Thread(r, "project-io").apply { isDaemon = true }
+        }
 
     override fun start(primaryStage: Stage) {
         logger.info("CircuitForge starting")
@@ -140,10 +135,10 @@ class MainApp : Application() {
             }
         }
         moduleStage.title = "${project.name} — $moduleName"
-        
+
         // Сохраняем ссылку на окно, чтобы GC не собрал его
         moduleWindows.add(moduleStage)
-        
+
         moduleStage.show()
     }
 

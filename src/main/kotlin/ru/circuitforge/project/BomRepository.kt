@@ -4,7 +4,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
-import java.nio.file.Path
 
 /**
  * Репозиторий для управления BOM документом (ПЭ3).
@@ -12,10 +11,11 @@ import java.nio.file.Path
 object BomRepository {
     private val logger = LoggerFactory.getLogger(BomRepository::class.java)
     private const val BOM_FILE_NAME = "bom.json"
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     /** Загружает BOM документ из файла проекта. Возвращает пустой при отсутствии. */
     fun load(paths: ProjectPaths): BomDocument {
@@ -30,7 +30,10 @@ object BomRepository {
     }
 
     /** Сохраняет BOM документ в файл проекта. */
-    fun save(paths: ProjectPaths, bom: BomDocument) {
+    fun save(
+        paths: ProjectPaths,
+        bom: BomDocument,
+    ) {
         try {
             val bomPath = paths.bom
             Files.createDirectories(bomPath.parent)
@@ -71,8 +74,8 @@ object BomRepository {
                                     refDes = refDes,
                                     componentId = comp.id,
                                     componentSlug = slug,
-                                    comment = comp.description
-                                )
+                                    comment = comp.description,
+                                ),
                             )
                         } catch (e: Exception) {
                             logger.warn("Failed to load component from $path, skipping", e)
@@ -115,25 +118,28 @@ object BomRepository {
             val comp = componentCache[item.componentId]
             val compName = comp?.name ?: "<not found>"
             val prefix = comp?.refPrefix ?: "?"
-            val slug = item.componentSlug.ifBlank {
-                // Если slug пустой, пытаемся найти по componentId в кэше
-                comp?.let { component ->
-                    componentsDir.resolve("${ComponentRepository.generateSlug(component.name)}.cfcomp").let { 
-                        if (Files.exists(it)) ComponentRepository.generateSlug(component.name) else ""
-                    }
-                } ?: ""
-            }
+            val slug =
+                item.componentSlug.ifBlank {
+                    // Если slug пустой, пытаемся найти по componentId в кэше
+                    comp?.let { component ->
+                        componentsDir.resolve("${ComponentRepository.generateSlug(component.name)}.cfcomp").let {
+                            if (Files.exists(it)) ComponentRepository.generateSlug(component.name) else ""
+                        }
+                    } ?: ""
+                }
 
-            rows.add(BomRow(
-                bomnetId = item.bomnetId,
-                number = item.number,
-                refDes = item.refDes,
-                componentId = item.componentId,
-                componentSlug = slug,
-                componentName = compName,
-                comment = item.comment,
-                refPrefix = prefix
-            ))
+            rows.add(
+                BomRow(
+                    bomnetId = item.bomnetId,
+                    number = item.number,
+                    refDes = item.refDes,
+                    componentId = item.componentId,
+                    componentSlug = slug,
+                    componentName = compName,
+                    comment = item.comment,
+                    refPrefix = prefix,
+                ),
+            )
         }
         return rows
     }

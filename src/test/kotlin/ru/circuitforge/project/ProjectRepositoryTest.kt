@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 
 class ProjectRepositoryTest {
-
     @TempDir
     lateinit var tempDir: java.nio.file.Path
 
@@ -35,21 +34,24 @@ class ProjectRepositoryTest {
     @Test
     fun `testInvalidName`() {
         // Пустое имя
-        val emptyException = assertThrows(IllegalArgumentException::class.java) {
-            ProjectRepository.create("", tempDir)
-        }
+        val emptyException =
+            assertThrows(IllegalArgumentException::class.java) {
+                ProjectRepository.create("", tempDir)
+            }
         assertTrue(emptyException.message!!.contains("blank"))
 
         // Имя с '/'
-        val slashException = assertThrows(IllegalArgumentException::class.java) {
-            ProjectRepository.create("invalid/name", tempDir)
-        }
+        val slashException =
+            assertThrows(IllegalArgumentException::class.java) {
+                ProjectRepository.create("invalid/name", tempDir)
+            }
         assertTrue(slashException.message!!.contains("/"))
 
         // Имя с '\'
-        val backslashException = assertThrows(IllegalArgumentException::class.java) {
-            ProjectRepository.create("invalid\\name", tempDir)
-        }
+        val backslashException =
+            assertThrows(IllegalArgumentException::class.java) {
+                ProjectRepository.create("invalid\\name", tempDir)
+            }
         assertTrue(backslashException.message!!.contains("\\"))
     }
 
@@ -78,11 +80,11 @@ class ProjectRepositoryTest {
         // Проверка, что project.cfproj существует
         assertTrue(
             Files.exists(projects[0].path.resolve("project.cfproj")),
-            "project.cfproj должен существовать для первого проекта"
+            "project.cfproj должен существовать для первого проекта",
         )
         assertTrue(
             Files.exists(projects[1].path.resolve("project.cfproj")),
-            "project.cfproj должен существовать для второго проекта"
+            "project.cfproj должен существовать для второго проекта",
         )
     }
 
@@ -90,9 +92,10 @@ class ProjectRepositoryTest {
     fun `testDuplicateProjectThrows`() {
         ProjectRepository.create("TestProject", tempDir)
 
-        val exception = assertThrows(IllegalArgumentException::class.java) {
-            ProjectRepository.create("TestProject", tempDir)
-        }
+        val exception =
+            assertThrows(IllegalArgumentException::class.java) {
+                ProjectRepository.create("TestProject", tempDir)
+            }
         assertTrue(exception.message!!.contains("already exists"))
     }
 

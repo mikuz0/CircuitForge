@@ -1,12 +1,10 @@
 package ru.circuitforge.project
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Instant
 
 /**
  * Репозиторий для управления проектами.
@@ -15,10 +13,11 @@ import java.time.Instant
 object ProjectRepository {
     private val logger = LoggerFactory.getLogger(ProjectRepository::class.java)
     private const val PROJECT_FILE_NAME = "project.cfproj"
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     /**
      * Создаёт новый проект в рабочей области.
@@ -28,7 +27,10 @@ object ProjectRepository {
      * @throws IllegalArgumentException если имя недопустимо или проект уже существует
      */
     @Throws(IllegalArgumentException::class)
-    fun create(name: String, workspace: Path): Path {
+    fun create(
+        name: String,
+        workspace: Path,
+    ): Path {
         if (name.isBlank()) {
             throw IllegalArgumentException("Project name cannot be blank")
         }
@@ -56,7 +58,10 @@ object ProjectRepository {
     }
 
     /** Сохраняет проект в указанный файл. */
-    fun save(path: Path, project: Project) {
+    fun save(
+        path: Path,
+        project: Project,
+    ) {
         try {
             Files.createDirectories(path.parent)
             val jsonStr = json.encodeToString(Project.serializer(), project)
@@ -78,23 +83,26 @@ object ProjectRepository {
             throw e
         }
     }
+
     /**
      * Генерирует машинное имя проекта: lowercase, пробелы -> '-',
      * только a-z0-9-, схлопывание '-', trim '-'.
      */
     @Throws(IllegalArgumentException::class)
     fun generateMachineName(name: String): String {
-        val base = name.lowercase()
-            .replace(' ', '-')
-            .replace(Regex("[^a-z0-9-]"), "")
-            .replace(Regex("-+"), "-")
-            .removePrefix("-")
-            .removeSuffix("-")
+        val base =
+            name.lowercase()
+                .replace(' ', '-')
+                .replace(Regex("[^a-z0-9-]"), "")
+                .replace(Regex("-+"), "-")
+                .removePrefix("-")
+                .removeSuffix("-")
         if (base.isBlank()) {
             throw IllegalArgumentException("Project name must contain at least one letter or digit")
         }
         return base
     }
+
     /**
      * Сканирует директорию на наличие файлов проектов.
      * Возвращает список ProjectInfo, отсортированный по имени.

@@ -2,10 +2,6 @@ package ru.circuitforge.ui.editor
 
 import org.slf4j.LoggerFactory
 import ru.circuitforge.ui.common.ModuleLauncher
-import ru.circuitforge.ui.common.ProjectAware
-import ru.circuitforge.ui.common.UiUtils
-import java.nio.file.Files
-import java.nio.file.Path
 
 /**
  * Standalone launch для редактора BOM.

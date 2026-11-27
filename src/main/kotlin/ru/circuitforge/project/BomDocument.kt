@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class BomDocument(
     val schemaVersion: Int = 1,
-    val items: List<BomItem> = emptyList()
+    val items: List<BomItem> = emptyList(),
 )
 
 /**
@@ -24,7 +24,7 @@ data class BomItem(
     val componentId: String = "",
     val componentSlug: String = "",
     val description: String = "",
-    val comment: String = ""
+    val comment: String = "",
 )
 
 /**
@@ -40,5 +40,5 @@ data class BomRow(
     val componentName: String,
     val description: String = "",
     val comment: String,
-    val refPrefix: String = ""
+    val refPrefix: String = "",
 )

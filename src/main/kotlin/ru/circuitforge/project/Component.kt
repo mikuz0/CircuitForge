@@ -16,7 +16,7 @@ data class Component(
     val refPrefix: String = "",
     val ports: List<Port> = emptyList(),
     val mainProperties: List<Property> = emptyList(),
-    val extraProperties: List<Property> = emptyList()
+    val extraProperties: List<Property> = emptyList(),
 )
 
 /**
@@ -26,7 +26,7 @@ data class Component(
 data class Property(
     val key: String = "",
     val value: String = "",
-    val unit: String = ""
+    val unit: String = "",
 )
 
 /**
@@ -38,7 +38,7 @@ data class Port(
     val number: Int = 0,
     val pinNumber: String = "",
     val name: String = "",
-    val description: String = ""
+    val description: String = "",
 )
 
 /**
@@ -53,5 +53,5 @@ data class ComponentSummary(
     val refPrefix: String,
     val portsCount: Int = 0,
     val mainPropertiesCount: Int = 0,
-    val extraPropertiesCount: Int = 0
+    val extraPropertiesCount: Int = 0,
 )

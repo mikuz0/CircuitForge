@@ -1,0 +1,37 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/home/mikuz/soft/android/gradle/wrapper/dists/gradle-8.5-bin/5t9huq95ubn472n8rpzujfbqh/gradle-8.5/lib/native-platform-0.22-milestone-25.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :loadKtlintReporters
+> Task :runKtlintCheckOverKotlinScripts
+> Task :ktlintKotlinScriptCheck
+> Task :runKtlintCheckOverTestSourceSet
+
+> Task :ktlintTestSourceSetCheck FAILED
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/BomRepositoryTest.kt:4:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/BomRepositoryTest.kt:39:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ComponentRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ComponentRepositoryTest.kt:110:37 A comment in a 'value_argument_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/NetRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ProjectRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/SchematicRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
+
+> Task :runKtlintCheckOverMainSourceSet
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':ktlintTestSourceSetCheck'.
+> A failure occurred while executing org.jlleitschuh.gradle.ktlint.worker.ConsoleReportWorkAction
+   > KtLint found code style violations. Please see the following reports:
+     - /home/mikuz/soft/IdeaProjects/CircuitForge/build/reports/ktlint/ktlintTestSourceSetCheck/ktlintTestSourceSetCheck.txt
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 7s
+6 actionable tasks: 6 executed

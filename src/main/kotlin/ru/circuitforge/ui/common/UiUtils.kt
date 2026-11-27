@@ -1,13 +1,11 @@
 package ru.circuitforge.ui.common
 
-import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.property.StringProperty
 import javafx.scene.control.Alert
 import javafx.scene.control.Alert.AlertType
 import javafx.scene.control.ButtonType
 import javafx.scene.control.Label
-import javafx.scene.layout.HBox
 import java.nio.file.Path
 
 /**
@@ -32,7 +30,10 @@ object UiUtils {
     }
 
     /** Shows an error alert dialog. */
-    fun errorAlert(title: String, message: String) {
+    fun errorAlert(
+        title: String,
+        message: String,
+    ) {
         val alert = Alert(AlertType.ERROR)
         alert.title = title
         alert.headerText = null
@@ -41,7 +42,11 @@ object UiUtils {
     }
 
     /** Shows a confirmation dialog and returns true if user confirmed. */
-    fun confirmAlert(title: String, header: String?, content: String): Boolean {
+    fun confirmAlert(
+        title: String,
+        header: String?,
+        content: String,
+    ): Boolean {
         val alert = Alert(AlertType.CONFIRMATION)
         alert.title = title
         alert.headerText = header

@@ -12,16 +12,15 @@ data class Project(
     val machineName: String,
     val version: Int = 1,
     @Serializable(with = InstantSerializer::class)
-    val created: Instant = Instant.now()
+    val created: Instant = Instant.now(),
 )
 
 data class ProjectInfo(
     val name: String,
     val machineName: String,
-    val path: java.nio.file.Path
+    val path: java.nio.file.Path,
 ) : Comparable<ProjectInfo> {
     override fun compareTo(other: ProjectInfo): Int {
         return name.compareTo(other.name, ignoreCase = true)
     }
 }
-

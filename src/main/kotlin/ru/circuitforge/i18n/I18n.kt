@@ -9,7 +9,7 @@ import java.util.*
 object I18n {
     enum class LocaleType(val code: String, val displayName: String) {
         EN("EN", "English"),
-        RU("RU", "Русский")
+        RU("RU", "Русский"),
     }
 
     @Volatile private var currentLocale: LocaleType = LocaleType.EN
@@ -28,7 +28,10 @@ object I18n {
      * @param key ключ в .properties файле
      * @param args аргументы для форматирования ({0}, {1}, ...)
      */
-    fun tr(key: String, vararg args: Any): String {
+    fun tr(
+        key: String,
+        vararg args: Any,
+    ): String {
         val pattern = bundle?.getString(key) ?: key
         return if (args.isEmpty()) {
             pattern

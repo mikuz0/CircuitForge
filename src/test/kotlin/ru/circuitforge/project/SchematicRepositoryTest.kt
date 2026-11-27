@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 
 class SchematicRepositoryTest {
-
     @TempDir
     lateinit var tempDir: java.nio.file.Path
 
@@ -30,10 +29,11 @@ class SchematicRepositoryTest {
     fun `testSaveAndLoad`() {
         val paths = setupProjectPaths()
 
-        val nodes = listOf(
-            SchematicNode(bomnetId = "node-1", x = 100.0, y = 200.0, rotation = 0.0),
-            SchematicNode(bomnetId = "node-2", x = 350.0, y = 200.0, rotation = 90.0)
-        )
+        val nodes =
+            listOf(
+                SchematicNode(bomnetId = "node-1", x = 100.0, y = 200.0, rotation = 0.0),
+                SchematicNode(bomnetId = "node-2", x = 350.0, y = 200.0, rotation = 90.0),
+            )
         val doc = SchematicDocument(schemaVersion = 1, nodes = nodes)
 
         SchematicRepository.save(paths, doc)
@@ -62,10 +62,11 @@ class SchematicRepositoryTest {
     fun `testSaveAndLoadPreservesRotation`() {
         val paths = setupProjectPaths()
 
-        val nodes = listOf(
-            SchematicNode(bomnetId = "n1", x = 0.0, y = 0.0, rotation = 180.0),
-            SchematicNode(bomnetId = "n2", x = 50.0, y = 50.0, rotation = 270.0)
-        )
+        val nodes =
+            listOf(
+                SchematicNode(bomnetId = "n1", x = 0.0, y = 0.0, rotation = 180.0),
+                SchematicNode(bomnetId = "n2", x = 50.0, y = 50.0, rotation = 270.0),
+            )
         SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
 
         val loaded = SchematicRepository.load(paths)

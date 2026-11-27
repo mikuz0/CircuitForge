@@ -1,6 +1,5 @@
 package ru.circuitforge.ui.projects
 
-import javafx.collections.FXCollections
 import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.Scene
@@ -26,17 +25,21 @@ class ProjectsView {
     private val statusLabel = Label()
 
     // Список проектов
-    private val listView = ListView<ProjectInfo>().apply {
-        prefHeight = 200.0
-        setCellFactory { _ ->
-            object : ListCell<ProjectInfo>() {
-                override fun updateItem(item: ProjectInfo?, empty: Boolean) {
-                    super.updateItem(item, empty)
-                    text = if (empty || item == null) null else item.name
+    private val listView =
+        ListView<ProjectInfo>().apply {
+            prefHeight = 200.0
+            setCellFactory { _ ->
+                object : ListCell<ProjectInfo>() {
+                    override fun updateItem(
+                        item: ProjectInfo?,
+                        empty: Boolean,
+                    ) {
+                        super.updateItem(item, empty)
+                        text = if (empty || item == null) null else item.name
+                    }
                 }
             }
         }
-    }
 
     // Кнопки модулей
     private val bomBtn = Button()
@@ -45,11 +48,12 @@ class ProjectsView {
     private val schematicBtn = Button()
 
     // Выбор языка
-    private val localeComboBox = ComboBox<I18n.LocaleType>().apply {
-        items.setAll(I18n.LocaleType.values().toList())
-        valueProperty().value = I18n.getCurrentLocale()
-        minWidth = 120.0
-    }
+    private val localeComboBox =
+        ComboBox<I18n.LocaleType>().apply {
+            items.setAll(I18n.LocaleType.values().toList())
+            valueProperty().value = I18n.getCurrentLocale()
+            minWidth = 120.0
+        }
 
     // Callback-свойства
     var onChooseWorkspace: (() -> Unit)? = null
@@ -60,64 +64,72 @@ class ProjectsView {
     var onSchematicClick: (() -> Unit)? = null
     var onLocaleChange: ((I18n.LocaleType) -> Unit)? = null
 
-    private val root = VBox(10.0).apply {
-        padding = Insets(15.0)
-        alignment = Pos.TOP_LEFT
-        style = "-fx-background-color: #fafafa;"
+    private val root =
+        VBox(10.0).apply {
+            padding = Insets(15.0)
+            alignment = Pos.TOP_LEFT
+            style = "-fx-background-color: #fafafa;"
 
-        // Workspace секция
-        val workspaceSection = VBox(5.0,
-            Label(),
-            HBox(10.0, workspacePathField, chooseWorkspaceBtn).apply {
-                alignment = Pos.CENTER_LEFT
-                HBox.setHgrow(workspacePathField, Priority.ALWAYS)
+            // Workspace секция
+            val workspaceSection =
+                VBox(
+                    5.0,
+                    Label(),
+                    HBox(10.0, workspacePathField, chooseWorkspaceBtn).apply {
+                        alignment = Pos.CENTER_LEFT
+                        HBox.setHgrow(workspacePathField, Priority.ALWAYS)
+                    },
+                ).apply {
+                    padding = Insets(5.0)
+                    style = "-fx-background-color: #e8e8e8; -fx-padding: 5; -fx-border-radius: 3;"
+                }
+
+            // New project секция
+            val newProjectSection =
+                VBox(
+                    5.0,
+                    Label(),
+                    HBox(10.0, newProjectNameField, createProjectBtn).apply {
+                        alignment = Pos.CENTER_LEFT
+                        HBox.setHgrow(newProjectNameField, Priority.ALWAYS)
+                    },
+                ).apply {
+                    padding = Insets(5.0)
+                    style = "-fx-background-color: #e8e8e8; -fx-padding: 5; -fx-border-radius: 3;"
+                }
+
+            // Статус
+            statusLabel.apply {
+                style = "-fx-text-fill: red; -fx-font-size: 12;"
             }
-        ).apply {
-            padding = Insets(5.0)
-            style = "-fx-background-color: #e8e8e8; -fx-padding: 5; -fx-border-radius: 3;"
-        }
 
-        // New project секция
-        val newProjectSection = VBox(5.0,
-            Label(),
-            HBox(10.0, newProjectNameField, createProjectBtn).apply {
-                alignment = Pos.CENTER_LEFT
-                HBox.setHgrow(newProjectNameField, Priority.ALWAYS)
-            }
-        ).apply {
-            padding = Insets(5.0)
-            style = "-fx-background-color: #e8e8e8; -fx-padding: 5; -fx-border-radius: 3;"
-        }
+            // Список проектов
+            val listSection =
+                VBox(5.0, Label(), listView).apply {
+                    VBox.setVgrow(listView, Priority.ALWAYS)
+                    padding = Insets(5.0)
+                    style = "-fx-background-color: white; -fx-border-color: #ccc; -fx-border-width: 1; -fx-border-radius: 3;"
+                }
 
-        // Статус
-        statusLabel.apply {
-            style = "-fx-text-fill: red; -fx-font-size: 12;"
-        }
+            // Выбор языка
+            val localeSection =
+                HBox(10.0, Label(I18n.tr("projects.label.language")), localeComboBox).apply {
+                    alignment = Pos.CENTER_LEFT
+                    padding = Insets(5.0)
+                    style = "-fx-background-color: #f0f0f0; -fx-padding: 5; -fx-border-radius: 3;"
+                }
 
-        // Список проектов
-        val listSection = VBox(5.0, Label(), listView).apply {
-            VBox.setVgrow(listView, Priority.ALWAYS)
-            padding = Insets(5.0)
-            style = "-fx-background-color: white; -fx-border-color: #ccc; -fx-border-width: 1; -fx-border-radius: 3;"
-        }
+            // Кнопки модулей
+            val moduleButtons =
+                HBox(10.0, bomBtn, netsBtn, componentsBtn, schematicBtn).apply {
+                    alignment = Pos.CENTER_LEFT
+                    padding = Insets(5.0)
+                    style = "-fx-background-color: #f0f0f0; -fx-padding: 5;"
+                }
+            setModuleButtonsEnabled(false)
 
-        // Выбор языка
-        val localeSection = HBox(10.0, Label(I18n.tr("projects.label.language")), localeComboBox).apply {
-            alignment = Pos.CENTER_LEFT
-            padding = Insets(5.0)
-            style = "-fx-background-color: #f0f0f0; -fx-padding: 5; -fx-border-radius: 3;"
+            children.addAll(workspaceSection, newProjectSection, statusLabel, listSection, localeSection, moduleButtons)
         }
-
-        // Кнопки модулей
-        val moduleButtons = HBox(10.0, bomBtn, netsBtn, componentsBtn, schematicBtn).apply {
-            alignment = Pos.CENTER_LEFT
-            padding = Insets(5.0)
-            style = "-fx-background-color: #f0f0f0; -fx-padding: 5;"
-        }
-        setModuleButtonsEnabled(false)
-
-        children.addAll(workspaceSection, newProjectSection, statusLabel, listSection, localeSection, moduleButtons)
-    }
 
     /** Строит сцену. */
     fun buildScene(): Scene {
@@ -202,13 +214,17 @@ class ProjectsView {
     }
 
     /** Устанавливает текст статуса (ошибки). */
-    fun setStatus(text: String, isError: Boolean = false) {
+    fun setStatus(
+        text: String,
+        isError: Boolean = false,
+    ) {
         statusLabel.text = text
-        statusLabel.style = if (isError) {
-            "-fx-text-fill: red; -fx-font-size: 12;"
-        } else {
-            "-fx-text-fill: green; -fx-font-size: 12;"
-        }
+        statusLabel.style =
+            if (isError) {
+                "-fx-text-fill: red; -fx-font-size: 12;"
+            } else {
+                "-fx-text-fill: green; -fx-font-size: 12;"
+            }
     }
 
     /** Включает/выключает кнопки модулей. */

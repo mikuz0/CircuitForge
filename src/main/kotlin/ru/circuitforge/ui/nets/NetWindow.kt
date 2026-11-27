@@ -25,9 +25,10 @@ import java.util.concurrent.Executors
 class NetWindow : ProjectAware {
     private val logger = LoggerFactory.getLogger(NetWindow::class.java)
     private val stage = Stage()
-    private val executor = Executors.newFixedThreadPool(2) { r ->
-        Thread(r, "nets-io").apply { isDaemon = true }
-    }
+    private val executor =
+        Executors.newFixedThreadPool(2) { r ->
+            Thread(r, "nets-io").apply { isDaemon = true }
+        }
 
     private var projectPaths: ProjectPaths? = null
 
@@ -103,27 +104,38 @@ class NetWindow : ProjectAware {
         val tabPane = TabPane()
         tabPane.tabMinWidth = 120.0
 
-        val listTab = Tab(I18n.tr("net.tab.list")).apply { isClosable = false; content = createListView() }
-        val matrixTab = Tab(I18n.tr("net.tab.matrix")).apply { isClosable = false; content = createMatrixView() }
+        val listTab =
+            Tab(I18n.tr("net.tab.list")).apply {
+                isClosable = false
+                content = createListView()
+            }
+        val matrixTab =
+            Tab(I18n.tr("net.tab.matrix")).apply {
+                isClosable = false
+                content = createMatrixView()
+            }
 
         tabPane.tabs.setAll(listTab, matrixTab)
         return tabPane
     }
 
     private fun createListView(): SplitPane {
-        val leftPanel = VBox(10.0, Label(I18n.tr("net.label.nets")), netTable).apply {
-            VBox.setVgrow(netTable, Priority.ALWAYS)
-            padding = Insets(10.0)
-            minWidth = 300.0
-            style = "-fx-background-color: white; -fx-border-color: #ddd; -fx-border-width: 0 1 0 0;"
-        }
+        val leftPanel =
+            VBox(10.0, Label(I18n.tr("net.label.nets")), netTable).apply {
+                VBox.setVgrow(netTable, Priority.ALWAYS)
+                padding = Insets(10.0)
+                minWidth = 300.0
+                style = "-fx-background-color: white; -fx-border-color: #ddd; -fx-border-width: 0 1 0 0;"
+            }
 
-        val rightPanel = VBox(10.0, connectionsLabel, connectionsTable,
-            HBox(10.0, addConnectionButton, deleteConnectionButton).apply { alignment = Pos.CENTER_LEFT }
-        ).apply {
-            VBox.setVgrow(connectionsTable, Priority.ALWAYS)
-            padding = Insets(10.0)
-        }
+        val rightPanel =
+            VBox(
+                10.0, connectionsLabel, connectionsTable,
+                HBox(10.0, addConnectionButton, deleteConnectionButton).apply { alignment = Pos.CENTER_LEFT },
+            ).apply {
+                VBox.setVgrow(connectionsTable, Priority.ALWAYS)
+                padding = Insets(10.0)
+            }
 
         return SplitPane(leftPanel, rightPanel).apply { dividerPositions[0] = 0.25 }
     }
@@ -169,15 +181,19 @@ class NetWindow : ProjectAware {
 
         val pinCountCol = TableColumn<Net, Int>(I18n.tr("net.col.pin.count"))
         pinCountCol.prefWidth = 80.0
-        pinCountCol.cellFactory = javafx.util.Callback { _: TableColumn<Net, Int> ->
-            object : TableCell<Net, Int>() {
-                override fun updateItem(item: Int?, empty: Boolean) {
-                    super.updateItem(item, empty)
-                    val net = tableRow.item
-                    text = if (empty || item == null) "" else net?.connections?.size?.toString() ?: ""
+        pinCountCol.cellFactory =
+            javafx.util.Callback { _: TableColumn<Net, Int> ->
+                object : TableCell<Net, Int>() {
+                    override fun updateItem(
+                        item: Int?,
+                        empty: Boolean,
+                    ) {
+                        super.updateItem(item, empty)
+                        val net = tableRow.item
+                        text = if (empty || item == null) "" else net?.connections?.size?.toString() ?: ""
+                    }
                 }
             }
-        }
 
         val labelCol = TableColumn<Net, Boolean>(I18n.tr("net.col.label.mode"))
         labelCol.setCellValueFactory { javafx.beans.property.SimpleBooleanProperty(it.value.labelMode) }
@@ -185,16 +201,20 @@ class NetWindow : ProjectAware {
         labelCol.setCellFactory { _ ->
             object : TableCell<Net, Boolean>() {
                 private val checkBox = CheckBox()
-                private val listener = javafx.beans.value.ChangeListener<Boolean> { _, _, newVal ->
-                    val net = tableRow.item
-                    if (net != null) {
-                        net.labelMode = newVal
-                        markDirty()
-                        saveNetsAsync()
+                private val listener =
+                    javafx.beans.value.ChangeListener<Boolean> { _, _, newVal ->
+                        val net = tableRow.item
+                        if (net != null) {
+                            net.labelMode = newVal
+                            markDirty()
+                            saveNetsAsync()
+                        }
                     }
-                }
-                
-                override fun updateItem(item: Boolean?, empty: Boolean) {
+
+                override fun updateItem(
+                    item: Boolean?,
+                    empty: Boolean,
+                ) {
                     super.updateItem(item, empty)
                     if (empty || item == null) {
                         checkBox.isSelected = false
@@ -271,7 +291,7 @@ class NetWindow : ProjectAware {
             javafx.collections.ListChangeListener { change ->
                 val selectedCount = netTable.selectionModel.selectedItems.size
                 mergeNetsButton.isDisable = (selectedCount != 2)
-            }
+            },
         )
         // Обработчики для соединений
         addConnectionButton.setOnAction { addConnection() }
@@ -331,7 +351,7 @@ class NetWindow : ProjectAware {
         if (bomRows.isEmpty()) {
             UiUtils.errorAlert(
                 I18n.tr("common.alert.error"),
-                I18n.tr("nets.dialog.add.connection.no.bom") ?: "BOM пуст. Сначала создайте BOM в редакторе."
+                I18n.tr("nets.dialog.add.connection.no.bom") ?: "BOM пуст. Сначала создайте BOM в редакторе.",
             )
             return
         }
@@ -340,7 +360,7 @@ class NetWindow : ProjectAware {
             ownerStage = stage,
             projectPaths = paths,
             currentNet = selectedNet,
-            allNets = nets.toList()
+            allNets = nets.toList(),
         ) { connection ->
             // Добавляем соединение к текущей цепи
             val currentNet = nets[selectedNetIndex]
@@ -389,11 +409,13 @@ class NetWindow : ProjectAware {
         val matrixRows = FXCollections.observableArrayList<NetMatrixCell>()
         nets.forEach { net ->
             val connectedPorts = net.connections.map { "${it.refDes}.${it.pinNumber}" }.toSet()
-            matrixRows.add(NetMatrixCell(
-                netName = net.name,
-                connectedPorts = connectedPorts,
-                net = net
-            ))
+            matrixRows.add(
+                NetMatrixCell(
+                    netName = net.name,
+                    connectedPorts = connectedPorts,
+                    net = net,
+                ),
+            )
         }
 
         // 3. Колонка с именами цепей
@@ -411,34 +433,44 @@ class NetWindow : ProjectAware {
             col.setCellValueFactory { cellData ->
                 javafx.beans.property.SimpleBooleanProperty(cellData.value.connectedPorts.contains(portRef))
             }
-            col.cellFactory = javafx.util.Callback {
-                object : TableCell<NetMatrixCell, Boolean>() {
-                    private val checkBox = CheckBox().apply {
-                        setOnAction {
-                            val rowItem = tableRow.item
-                            if (rowItem != null) {
-                                toggleConnection(rowItem.net, portRef, isSelected)
+            col.cellFactory =
+                javafx.util.Callback {
+                    object : TableCell<NetMatrixCell, Boolean>() {
+                        private val checkBox =
+                            CheckBox().apply {
+                                setOnAction {
+                                    val rowItem = tableRow.item
+                                    if (rowItem != null) {
+                                        toggleConnection(rowItem.net, portRef, isSelected)
+                                    }
+                                }
+                            }
+
+                        override fun updateItem(
+                            item: Boolean?,
+                            empty: Boolean,
+                        ) {
+                            super.updateItem(item, empty)
+                            if (empty || item == null) {
+                                graphic = null
+                            } else {
+                                graphic = checkBox
+                                checkBox.isSelected = item
                             }
                         }
                     }
-                    override fun updateItem(item: Boolean?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        if (empty || item == null) {
-                            graphic = null
-                        } else {
-                            graphic = checkBox
-                            checkBox.isSelected = item
-                        }
-                    }
                 }
-            }
             matrixTable.columns.add(col)
         }
 
         matrixTable.items = matrixRows
     }
 
-    private fun toggleConnection(net: Net, portRef: String, connected: Boolean) {
+    private fun toggleConnection(
+        net: Net,
+        portRef: String,
+        connected: Boolean,
+    ) {
         val parts = portRef.split(".", limit = 2)
         val refDes = parts[0]
         val pinNumber = parts.getOrElse(1) { "" }
@@ -449,12 +481,16 @@ class NetWindow : ProjectAware {
         val currentNet = nets[netIndex]
         val existingConn = currentNet.connections.find { it.refDes == refDes && it.pinNumber == pinNumber }
 
-        val newConnections = if (connected) {
-            if (existingConn == null) currentNet.connections + NetConnection(refDes, pinNumber)
-            else currentNet.connections
-        } else {
-            currentNet.connections.filter { it != existingConn }
-        }
+        val newConnections =
+            if (connected) {
+                if (existingConn == null) {
+                    currentNet.connections + NetConnection(refDes, pinNumber)
+                } else {
+                    currentNet.connections
+                }
+            } else {
+                currentNet.connections.filter { it != existingConn }
+            }
 
         nets[netIndex] = currentNet.copy(connections = newConnections)
 
@@ -477,9 +513,12 @@ class NetWindow : ProjectAware {
 
         val file = chooser.showSaveDialog(stage)
         if (file != null) {
-            val task = object : javafx.concurrent.Task<Unit>() {
-                override fun call() { NetRepository.exportToCsv(paths, file.toPath()) }
-            }
+            val task =
+                object : javafx.concurrent.Task<Unit>() {
+                    override fun call() {
+                        NetRepository.exportToCsv(paths, file.toPath())
+                    }
+                }
             task.setOnSucceeded {
                 statusLabel.text = I18n.tr("net.status.exported", file.path)
                 statusLabel.style = "-fx-text-fill: green;"
@@ -494,14 +533,15 @@ class NetWindow : ProjectAware {
     }
 
     private fun saveNets() {
-        val task = object : javafx.concurrent.Task<Unit>() {
-            override fun call() {
-                projectPaths?.let { paths ->
-                    NetRepository.save(paths, NetDocument(schemaVersion = 1, nets = nets.toList()))
-                    savedSnapshot = serializeCurrentState()
+        val task =
+            object : javafx.concurrent.Task<Unit>() {
+                override fun call() {
+                    projectPaths?.let { paths ->
+                        NetRepository.save(paths, NetDocument(schemaVersion = 1, nets = nets.toList()))
+                        savedSnapshot = serializeCurrentState()
+                    }
                 }
             }
-        }
         task.setOnSucceeded {
             statusLabel.text = I18n.tr("net.status.saved")
             statusLabel.style = "-fx-text-fill: green;"
@@ -509,8 +549,11 @@ class NetWindow : ProjectAware {
         }
         task.setOnFailed {
             val ex = task.exception
-            if (ex is IllegalArgumentException) UiUtils.errorAlert(I18n.tr("net.alert.validation.error"), ex.message ?: I18n.tr("common.alert.unknown.error"))
-            else UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.status.save.failed"))
+            if (ex is IllegalArgumentException) {
+                UiUtils.errorAlert(I18n.tr("net.alert.validation.error"), ex.message ?: I18n.tr("common.alert.unknown.error"))
+            } else {
+                UiUtils.errorAlert(I18n.tr("common.alert.error"), I18n.tr("net.status.save.failed"))
+            }
             statusLabel.text = I18n.tr("net.status.save.failed")
             statusLabel.style = "-fx-text-fill: red;"
             logger.error("Failed to save netlist", ex)
@@ -520,19 +563,22 @@ class NetWindow : ProjectAware {
 
     /** Асинхронное сохранение без обновления snapshot (для автосохранения после добавления соединения). */
     private fun saveNetsAsync() {
-        val task = object : javafx.concurrent.Task<Unit>() {
-            override fun call() {
-                projectPaths?.let { paths ->
-                    NetRepository.save(paths, NetDocument(schemaVersion = 1, nets = nets.toList()))
+        val task =
+            object : javafx.concurrent.Task<Unit>() {
+                override fun call() {
+                    projectPaths?.let { paths ->
+                        NetRepository.save(paths, NetDocument(schemaVersion = 1, nets = nets.toList()))
+                    }
+                }
+
+                override fun succeeded() {
+                    logger.info("Netlist auto-saved after connection add")
+                }
+
+                override fun failed() {
+                    logger.error("Failed to auto-save netlist", exception)
                 }
             }
-            override fun succeeded() {
-                logger.info("Netlist auto-saved after connection add")
-            }
-            override fun failed() {
-                logger.error("Failed to auto-save netlist", exception)
-            }
-        }
         executor.submit(task)
     }
 
@@ -575,6 +621,7 @@ class NetWindow : ProjectAware {
     }
 
     private fun isDirty(): Boolean = serializeCurrentState() != savedSnapshot
+
     private fun markDirty() {
         statusLabel.text = I18n.tr("bom.alert.unsaved")
         statusLabel.style = "-fx-text-fill: orange; -fx-font-size: 11;"
@@ -587,7 +634,7 @@ class NetWindow : ProjectAware {
             val project = ProjectRepository.load(projectPath.resolve("project.cfproj"))
             val paths = ProjectPaths(projectPath, project.machineName)
             this.projectPaths = paths
-            projectLabel.text = "Project: ${projectPath}"
+            projectLabel.text = "Project: $projectPath"
             val doc = NetRepository.load(paths)
             nets.setAll(doc.nets)
             netList.setAll(doc.nets)
@@ -603,6 +650,7 @@ class NetWindow : ProjectAware {
     }
 
     override fun getStage(): Stage = stage
+
     private fun renameNet() {
         val selectedNet = netTable.selectionModel.selectedItem ?: return
         val selectedNetName = selectedNet.name
@@ -617,8 +665,10 @@ class NetWindow : ProjectAware {
             if (newName == selectedNetName) return
 
             if (nets.any { it.name == newName }) {
-                UiUtils.errorAlert(I18n.tr("common.alert.error"),
-                    "Цепь с именем '$newName' уже существует. Используйте 'Объединить' для слияния.")
+                UiUtils.errorAlert(
+                    I18n.tr("common.alert.error"),
+                    "Цепь с именем '$newName' уже существует. Используйте 'Объединить' для слияния.",
+                )
                 return
             }
 
@@ -690,14 +740,13 @@ class NetWindow : ProjectAware {
             }
         }
     }
-
-
 }
 
 /** Ячейка матрицы связей. */
+
 /** Ячейка матрицы связей. Одна строка = одна цепь. */
 data class NetMatrixCell(
     val netName: String,
     val connectedPorts: Set<String>, // например, setOf("DD2.1", "R5.1")
-    val net: Net
+    val net: Net,
 )

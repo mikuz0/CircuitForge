@@ -7,7 +7,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 
 class BomRepositoryTest {
-
     @TempDir
     lateinit var tempDir: java.nio.file.Path
 
@@ -31,13 +30,15 @@ class BomRepositoryTest {
     fun `testSaveAndLoad`() {
         val paths = setupProjectPaths()
 
-        val bomDoc = BomDocument(
-            schemaVersion = 1,
-            items = listOf(
-                BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k"),
-                BomItem(number = 2, refDes = "C1", componentId = "uuid-2", componentSlug = "capacitor-10uf", comment = "10uF electrolytic")
+        val bomDoc =
+            BomDocument(
+                schemaVersion = 1,
+                items =
+                    listOf(
+                        BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k"),
+                        BomItem(number = 2, refDes = "C1", componentId = "uuid-2", componentSlug = "capacitor-10uf", comment = "10uF electrolytic"),
+                    ),
             )
-        )
 
         BomRepository.save(paths, bomDoc)
 
@@ -59,23 +60,25 @@ class BomRepositoryTest {
 
         // Создаём 2 компонента
         val comp1Path = paths.projectDir.resolve("components").resolve("resistor-0603.cfcomp")
-        val comp1 = Component(
-            schemaVersion = 1,
-            name = "Resistor 0603",
-            description = "Generic 0603 resistor",
-            refPrefix = "R",
-            ports = listOf(Port(1, "1", "Pin1", ""), Port(2, "2", "Pin2", ""))
-        )
+        val comp1 =
+            Component(
+                schemaVersion = 1,
+                name = "Resistor 0603",
+                description = "Generic 0603 resistor",
+                refPrefix = "R",
+                ports = listOf(Port(1, "1", "Pin1", ""), Port(2, "2", "Pin2", "")),
+            )
         ComponentRepository.save(comp1Path, comp1)
 
         val comp2Path = paths.projectDir.resolve("components").resolve("capacitor-10uf.cfcomp")
-        val comp2 = Component(
-            schemaVersion = 1,
-            name = "Capacitor 10uF",
-            description = "Electrolytic capacitor",
-            refPrefix = "C",
-            ports = listOf(Port(1, "1", "Pin1", ""), Port(2, "2", "Pin2", ""))
-        )
+        val comp2 =
+            Component(
+                schemaVersion = 1,
+                name = "Capacitor 10uF",
+                description = "Electrolytic capacitor",
+                refPrefix = "C",
+                ports = listOf(Port(1, "1", "Pin1", ""), Port(2, "2", "Pin2", "")),
+            )
         ComponentRepository.save(comp2Path, comp2)
 
         val bomDoc = BomRepository.initFromComponents(paths)
@@ -94,12 +97,14 @@ class BomRepositoryTest {
     fun `testSerializationFormat`() {
         val paths = setupProjectPaths()
 
-        val bomDoc = BomDocument(
-            schemaVersion = 1,
-            items = listOf(
-                BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k")
+        val bomDoc =
+            BomDocument(
+                schemaVersion = 1,
+                items =
+                    listOf(
+                        BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k"),
+                    ),
             )
-        )
 
         BomRepository.save(paths, bomDoc)
 

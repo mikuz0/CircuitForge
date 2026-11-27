@@ -2,9 +2,9 @@ package ru.circuitforge.ui.schematic
 
 import org.slf4j.LoggerFactory
 import ru.circuitforge.project.*
+import ru.circuitforge.ui.schematic.symbols.SvgParser
 import ru.circuitforge.ui.schematic.symbols.SymbolLibrary
 import ru.circuitforge.ui.schematic.symbols.SymbolRegistry
-import ru.circuitforge.ui.schematic.symbols.SvgParser
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -18,7 +18,7 @@ class SchematicExporter {
         componentsMap: Map<String, Component>,
         bomRows: List<BomRow>,
         symbolLibrary: SymbolLibrary,
-        outputDir: Path
+        outputDir: Path,
     ): Path {
         val (viewX, viewY, width, height) = computeViewBox(document)
         val svg = StringBuilder()
@@ -26,11 +26,12 @@ class SchematicExporter {
         svg.appendLine("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"$viewX $viewY $width $height\">")
 
         svg.appendLine("<defs>")
-        val usedSymbols = document.nodes.mapNotNull { node ->
-            val row = bomRows.find { it.bomnetId == node.bomnetId } ?: return@mapNotNull null
-            val comp = componentsMap[row.componentId] ?: return@mapNotNull null
-            comp.name to symbolLibrary.getSymbolType(comp.name)
-        }.distinctBy { it.second }.map { it.second }.toSet()
+        val usedSymbols =
+            document.nodes.mapNotNull { node ->
+                val row = bomRows.find { it.bomnetId == node.bomnetId } ?: return@mapNotNull null
+                val comp = componentsMap[row.componentId] ?: return@mapNotNull null
+                comp.name to symbolLibrary.getSymbolType(comp.name)
+            }.distinctBy { it.second }.map { it.second }.toSet()
 
         for (symbolType in usedSymbols) {
             try {
@@ -48,12 +49,13 @@ class SchematicExporter {
             val row = bomRows.find { it.bomnetId == node.bomnetId } ?: continue
             val comp = componentsMap[row.componentId] ?: continue
             val symbolType = symbolLibrary.getSymbolType(comp.name)
-            val transform = buildString {
-                append("translate(${node.x}, ${node.y})")
-                if (node.rotation != 0.0) {
-                    append(" rotate(${node.rotation})")
+            val transform =
+                buildString {
+                    append("translate(${node.x}, ${node.y})")
+                    if (node.rotation != 0.0) {
+                        append(" rotate(${node.rotation})")
+                    }
                 }
-            }
             svg.appendLine("  <use href=\"#sym-$symbolType\" transform=\"$transform\"/>")
             svg.appendLine("  <text x=\"${node.x - 20}\" y=\"${node.y - 35}\" font-weight=\"bold\" font-size=\"12\" fill=\"black\">${row.refDes}</text>")
             svg.appendLine("  <text x=\"${node.x - 20}\" y=\"${node.y - 10}\" font-size=\"11\" fill=\"gray\">${row.comment}</text>")
@@ -96,7 +98,7 @@ class SchematicExporter {
         refDes: String,
         pinNumber: String,
         bomRows: List<BomRow>,
-        componentsMap: Map<String, Component>
+        componentsMap: Map<String, Component>,
     ): Pair<Double, Double>? {
         val row = bomRows.find { it.refDes == refDes } ?: return null
         val node = document.nodes.find { it.bomnetId == row.bomnetId } ?: return null

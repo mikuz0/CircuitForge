@@ -1,9 +1,8 @@
 package ru.circuitforge.ui.schematic.symbols
 
+import javafx.scene.layout.Pane
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import javafx.scene.layout.Pane
-import ru.circuitforge.ui.schematic.symbols.SvgParser
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -13,7 +12,7 @@ import java.nio.file.Path
  */
 class SymbolLibrary private constructor(
     private val symbolsDir: Path,
-    private val config: SymbolConfig
+    private val config: SymbolConfig,
 ) {
     private val logger = LoggerFactory.getLogger(SymbolLibrary::class.java)
     private val parser = SvgParser()
@@ -22,10 +21,11 @@ class SymbolLibrary private constructor(
     private val sizeCache = mutableMapOf<String, Pair<Double, Double>>()
 
     companion object {
-        private val json = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-        }
+        private val json =
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+            }
 
         /**
          * Создаёт SymbolLibrary из директории проекта.
@@ -66,7 +66,10 @@ class SymbolLibrary private constructor(
         /**
          * Мерджит два конфига: project-конфиг переопределяет базовый.
          */
-        private fun mergeConfigs(base: SymbolConfig, project: SymbolConfig): SymbolConfig {
+        private fun mergeConfigs(
+            base: SymbolConfig,
+            project: SymbolConfig,
+        ): SymbolConfig {
             val mergedSymbols = base.symbols.toMutableMap()
             mergedSymbols.putAll(project.symbols)
 
@@ -75,7 +78,7 @@ class SymbolLibrary private constructor(
 
             return SymbolConfig(
                 symbols = mergedSymbols,
-                mappings = mergedMappings
+                mappings = mergedMappings,
             )
         }
 
@@ -123,7 +126,10 @@ class SymbolLibrary private constructor(
     /**
      * Получает позицию порта (x, y) относительно центра символа.
      */
-    fun getPortPosition(symbolType: String, pinNumber: String): Pair<Double, Double>? {
+    fun getPortPosition(
+        symbolType: String,
+        pinNumber: String,
+    ): Pair<Double, Double>? {
         return config.symbols[symbolType]?.ports?.get(pinNumber)?.let {
             Pair(it.x, it.y)
         }
@@ -164,7 +170,12 @@ class SymbolLibrary private constructor(
     /**
      * Загружает SVG-символ из файла.
      */
-    private fun loadSymbolFromFile(symbolType: String, filePath: Path, width: Double, height: Double): Pane {
+    private fun loadSymbolFromFile(
+        symbolType: String,
+        filePath: Path,
+        width: Double,
+        height: Double,
+    ): Pane {
         return try {
             logger.info("Loading symbol $symbolType from $filePath")
             if (Files.exists(filePath)) {
@@ -188,8 +199,12 @@ class SymbolLibrary private constructor(
     /**
      * Загружает SVG-символ из resources.
      */
-    private fun loadSymbolFromResources(symbolType: String, width: Double, height: Double): Pane? {
-        val resourcePath = "/symbols/${symbolType}.svg"
+    private fun loadSymbolFromResources(
+        symbolType: String,
+        width: Double,
+        height: Double,
+    ): Pane? {
+        val resourcePath = "/symbols/$symbolType.svg"
         val inputStream = javaClass.getResourceAsStream(resourcePath) ?: return null
 
         return try {
@@ -220,7 +235,7 @@ class SymbolLibrary private constructor(
             prefWidth = width
             prefHeight = height
             style = "-fx-background-color: transparent;"
-            userData = emptyDoc  // Для совместимости с ComponentRenderer
+            userData = emptyDoc // Для совместимости с ComponentRenderer
         }
     }
 

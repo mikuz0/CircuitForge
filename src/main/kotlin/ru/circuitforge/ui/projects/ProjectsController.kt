@@ -16,9 +16,10 @@ import java.util.concurrent.Executors
  */
 class ProjectsController(private val view: ProjectsView) {
     private val logger = LoggerFactory.getLogger(ProjectsController::class.java)
-    private val executor = Executors.newFixedThreadPool(2) { r ->
-        Thread(r, "project-io").apply { isDaemon = true }
-    }
+    private val executor =
+        Executors.newFixedThreadPool(2) { r ->
+            Thread(r, "project-io").apply { isDaemon = true }
+        }
 
     /** Устанавливает рабочую область и загружает проекты. */
     fun setWorkspace(path: Path) {
@@ -32,11 +33,12 @@ class ProjectsController(private val view: ProjectsView) {
 
     /** Загружает список проектов из указанной директории. */
     fun loadProjects(dir: Path) {
-        val task = object : Task<List<ProjectInfo>>() {
-            override fun call(): List<ProjectInfo> {
-                return ProjectRepository.scan(dir)
+        val task =
+            object : Task<List<ProjectInfo>>() {
+                override fun call(): List<ProjectInfo> {
+                    return ProjectRepository.scan(dir)
+                }
             }
-        }
         task.setOnSucceeded {
             view.setProjects(task.value)
             view.setStatus(I18n.tr("projects.status.loaded", task.value.size))
@@ -65,11 +67,12 @@ class ProjectsController(private val view: ProjectsView) {
             return
         }
 
-        val task = object : Task<Unit>() {
-            override fun call() {
-                ProjectRepository.create(name, workspace)
+        val task =
+            object : Task<Unit>() {
+                override fun call() {
+                    ProjectRepository.create(name, workspace)
+                }
             }
-        }
 
         task.setOnSucceeded {
             view.clearNewProjectName()

@@ -24,7 +24,7 @@ object PortCalculator {
         nodesMap: Map<String, SchematicNode>,
         componentsMap: Map<String, Component>,
         row: BomRow,
-        pinNumber: String
+        pinNumber: String,
     ): Pair<Double, Double>? {
         val node = nodesMap[row.bomnetId] ?: return null
         val comp = componentsMap[row.componentId] ?: return null
@@ -58,34 +58,35 @@ object PortCalculator {
         if (portIndex == -1) return null
 
         val totalPorts = comp.ports.size
-        
+
         // Рассчитываем размеры с контролем минимального шага между портами
         val minPinSpacing = 4 * 12.5 // 50px
         val minWidth = 100.0
         val minHeight = 80.0
-        
+
         val perSide = if (totalPorts > 2) (totalPorts + 3) / 4 else 1
         val dynamicWidth = maxOf(perSide * minPinSpacing, minWidth)
         val dynamicHeight = maxOf(perSide * minPinSpacing, minHeight)
-        
+
         val centerX = node.x + dynamicWidth / 2.0
         val centerY = node.y + dynamicHeight / 2.0
         val halfW = dynamicWidth / 2.0
         val halfH = dynamicHeight / 2.0
 
-        val (pinX, pinY) = if (totalPorts <= 2) {
-            if (portIndex == 0) Pair(-halfW, 0.0) else Pair(halfW, 0.0)
-        } else {
-            // Многопиновый: по периметру (верх-право-низ-лево)
-            val side = portIndex / perSide
-            val posInSide = portIndex % perSide
-            when (side) {
-                0 -> Pair(-halfW + (posInSide + 1) * dynamicWidth / (perSide + 1), -halfH) // верх
-                1 -> Pair(halfW, -halfH + (posInSide + 1) * dynamicHeight / (perSide + 1)) // право
-                2 -> Pair(halfW - (posInSide + 1) * dynamicWidth / (perSide + 1), halfH)  // низ
-                else -> Pair(-halfW, halfH - (posInSide + 1) * dynamicHeight / (perSide + 1)) // лево
+        val (pinX, pinY) =
+            if (totalPorts <= 2) {
+                if (portIndex == 0) Pair(-halfW, 0.0) else Pair(halfW, 0.0)
+            } else {
+                // Многопиновый: по периметру (верх-право-низ-лево)
+                val side = portIndex / perSide
+                val posInSide = portIndex % perSide
+                when (side) {
+                    0 -> Pair(-halfW + (posInSide + 1) * dynamicWidth / (perSide + 1), -halfH) // верх
+                    1 -> Pair(halfW, -halfH + (posInSide + 1) * dynamicHeight / (perSide + 1)) // право
+                    2 -> Pair(halfW - (posInSide + 1) * dynamicWidth / (perSide + 1), halfH) // низ
+                    else -> Pair(-halfW, halfH - (posInSide + 1) * dynamicHeight / (perSide + 1)) // лево
+                }
             }
-        }
 
         var baseX = centerX + pinX
         var baseY = centerY + pinY
@@ -109,7 +110,7 @@ object PortCalculator {
         nodesMap: Map<String, SchematicNode>,
         componentsMap: Map<String, Component>,
         row: BomRow,
-        pinNumber: String
+        pinNumber: String,
     ): Pair<Double, Double>? {
         return getPortCoordinates(nodesMap, componentsMap, row, pinNumber)
     }

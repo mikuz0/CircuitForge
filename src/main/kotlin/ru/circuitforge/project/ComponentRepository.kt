@@ -15,22 +15,24 @@ import java.nio.file.StandardCopyOption
 object ComponentRepository {
     private val logger = LoggerFactory.getLogger(ComponentRepository::class.java)
     private const val CFCOMP_EXT = ".cfcomp"
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     /**
      * Генерирует уникальный slug из имени компонента.
      * Формат: lowercase, пробелы в '-', только a-z0-9-.
      */
     fun generateSlug(name: String): String {
-        val base = name.lowercase()
-            .replace(' ', '-')
-            .replace(Regex("[^a-z0-9-]"), "")
-            .replace(Regex("-+"), "-")
-            .removePrefix("-")
-            .removeSuffix("-")
+        val base =
+            name.lowercase()
+                .replace(' ', '-')
+                .replace(Regex("[^a-z0-9-]"), "")
+                .replace(Regex("-+"), "-")
+                .removePrefix("-")
+                .removeSuffix("-")
 
         return if (base.isBlank()) "component" else base
     }
@@ -46,29 +48,34 @@ object ComponentRepository {
         refPrefix: String,
         ports: List<Port> = emptyList(),
         mainProperties: List<Property> = emptyList(),
-        extraProperties: List<Property> = emptyList()
+        extraProperties: List<Property> = emptyList(),
     ): String {
         val slug = generateUniqueSlug(projectDir, name)
-        val component = Component(
-            schemaVersion = 1,
-            name = name,
-            description = description,
-            refPrefix = refPrefix,
-            ports = ports,
-            mainProperties = mainProperties,
-            extraProperties = extraProperties
-        )
+        val component =
+            Component(
+                schemaVersion = 1,
+                name = name,
+                description = description,
+                refPrefix = refPrefix,
+                ports = ports,
+                mainProperties = mainProperties,
+                extraProperties = extraProperties,
+            )
         val path = projectDir.resolve("components").resolve("${slug}$CFCOMP_EXT")
         save(path, component)
         logger.info("Component created: ${slug}$CFCOMP_EXT")
         return slug
     }
+
     /**
      * Создаёт копию существующего компонента с новым id и новым именем файла.
      * Имя копии: "<name> copy", при конфликте — "<name> copy-1", "<name> copy-2", ...
      * @return slug созданной копии
      */
-    fun duplicateComponent(projectDir: Path, sourceSlug: String): String {
+    fun duplicateComponent(
+        projectDir: Path,
+        sourceSlug: String,
+    ): String {
         val sourcePath = projectDir.resolve("components").resolve("${sourceSlug}$CFCOMP_EXT")
         val source = load(sourcePath)
 
@@ -76,14 +83,16 @@ object ComponentRepository {
         val newSlug = generateUniqueSlug(projectDir, copyName)
         val newPath = projectDir.resolve("components").resolve("${newSlug}$CFCOMP_EXT")
 
-        val copy = source.copy(
-            id = java.util.UUID.randomUUID().toString(),
-            name = copyName
-        )
+        val copy =
+            source.copy(
+                id = java.util.UUID.randomUUID().toString(),
+                name = copyName,
+            )
         save(newPath, copy)
         logger.info("Component duplicated: $sourceSlug -> $newSlug")
         return newSlug
     }
+
     /**
      * Сохраняет существующий компонент. Проверяет уникальность name,
      * переименовывает файл при смене slug.
@@ -97,47 +106,50 @@ object ComponentRepository {
         refPrefix: String,
         ports: List<Port>,
         mainProperties: List<Property> = emptyList(),
-        extraProperties: List<Property> = emptyList()
+        extraProperties: List<Property> = emptyList(),
     ): String {
         val componentsDir = projectDir.resolve("components")
         val oldPath = componentsDir.resolve("${originalSlug}$CFCOMP_EXT")
 
         // 1. Читаем старый ID (если файл существует)
-        val existingId = if (Files.exists(oldPath)) {
-            try {
-                load(oldPath).id
-            } catch (e: Exception) {
-                java.util.UUID.randomUUID().toString() // Fallback
+        val existingId =
+            if (Files.exists(oldPath)) {
+                try {
+                    load(oldPath).id
+                } catch (e: Exception) {
+                    java.util.UUID.randomUUID().toString() // Fallback
+                }
+            } else {
+                java.util.UUID.randomUUID().toString()
             }
-        } else {
-            java.util.UUID.randomUUID().toString()
-        }
 
         // 2. Генерируем новое имя файла
         // Загружаем компонент и сравниваем имя — если имя не изменилось, сохраняем текущий slug
         val oldName = runCatching { load(oldPath).name }.getOrNull()
         val generatedSlug = generateSlug(name)
-        val newSlug = if (oldName != null && oldName.trim() == name.trim()) {
-            // Имя компонента не изменилось — пользователь мог переименовать файл вручную
-            // Сохраняем текущий slug (originalSlug)
-            originalSlug
-        } else {
-            // Имя изменилось — генерируем новый slug
-            generateUniqueSlug(projectDir, name, originalSlug)
-        }
+        val newSlug =
+            if (oldName != null && oldName.trim() == name.trim()) {
+                // Имя компонента не изменилось — пользователь мог переименовать файл вручную
+                // Сохраняем текущий slug (originalSlug)
+                originalSlug
+            } else {
+                // Имя изменилось — генерируем новый slug
+                generateUniqueSlug(projectDir, name, originalSlug)
+            }
         val newPath = componentsDir.resolve("${newSlug}$CFCOMP_EXT")
 
         // 3. Создаем объект с сохраненным ID
-        val component = Component(
-            schemaVersion = 1,
-            id = existingId, // <-- СОХРАНЯЕМ СТАРЫЙ ID
-            name = name,
-            description = description,
-            refPrefix = refPrefix,
-            ports = ports,
-            mainProperties = mainProperties,
-            extraProperties = extraProperties
-        )
+        val component =
+            Component(
+                schemaVersion = 1,
+                id = existingId, // <-- СОХРАНЯЕМ СТАРЫЙ ID
+                name = name,
+                description = description,
+                refPrefix = refPrefix,
+                ports = ports,
+                mainProperties = mainProperties,
+                extraProperties = extraProperties,
+            )
 
         // 4. Сначала сохраняем данные в новый файл
         save(newPath, component)
@@ -153,7 +165,10 @@ object ComponentRepository {
     /**
      * Загружает компонент по slug из директории проекта.
      */
-    fun loadComponent(projectDir: Path, slug: String): Component {
+    fun loadComponent(
+        projectDir: Path,
+        slug: String,
+    ): Component {
         val path = projectDir.resolve("components").resolve("${slug}$CFCOMP_EXT")
         return load(path)
     }
@@ -161,7 +176,10 @@ object ComponentRepository {
     /**
      * Удаляет компонент по slug.
      */
-    fun deleteComponent(projectDir: Path, slug: String) {
+    fun deleteComponent(
+        projectDir: Path,
+        slug: String,
+    ) {
         val path = projectDir.resolve("components").resolve("${slug}$CFCOMP_EXT")
         delete(path)
     }
@@ -181,16 +199,17 @@ object ComponentRepository {
                             // Имя файла без расширения — это наш "slug" для UI
                             val fileSlug = path.fileName.toString().removeSuffix(CFCOMP_EXT)
 
-                            val summary = ComponentSummary(
-                                id = comp.id,
-                                slug = fileSlug, // Используем имя файла
-                                name = comp.name,
-                                description = comp.description,
-                                refPrefix = comp.refPrefix,
-                                portsCount = comp.ports.size,
-                                mainPropertiesCount = comp.mainProperties.size,
-                                extraPropertiesCount = comp.extraProperties.size
-                            )
+                            val summary =
+                                ComponentSummary(
+                                    id = comp.id,
+                                    slug = fileSlug, // Используем имя файла
+                                    name = comp.name,
+                                    description = comp.description,
+                                    refPrefix = comp.refPrefix,
+                                    portsCount = comp.ports.size,
+                                    mainPropertiesCount = comp.mainProperties.size,
+                                    extraPropertiesCount = comp.extraProperties.size,
+                                )
                             components.add(summary)
                         } catch (e: Exception) {
                             logger.warn("Failed to load component from $path, skipping", e)
@@ -204,7 +223,11 @@ object ComponentRepository {
     }
 
     /** Генерирует уникальный slug с учётом существующих файлов. */
-    private fun generateUniqueSlug(projectDir: Path, name: String, excludeSlug: String? = null): String {
+    private fun generateUniqueSlug(
+        projectDir: Path,
+        name: String,
+        excludeSlug: String? = null,
+    ): String {
         val baseSlug = generateSlug(name)
         val componentsDir = projectDir.resolve("components")
         var candidate = baseSlug
@@ -226,7 +249,10 @@ object ComponentRepository {
     }
 
     /** Сохраняет компонент в указанный файл. */
-    fun save(path: Path, component: Component) {
+    fun save(
+        path: Path,
+        component: Component,
+    ) {
         try {
             Files.createDirectories(path.parent)
             val jsonStr = json.encodeToString(Component.serializer(), component)
@@ -259,11 +285,16 @@ object ComponentRepository {
             throw e
         }
     }
+
     /**
      * Переименовывает файл компонента.
      * Сохраняет все данные, меняет только имя файла.
      */
-    fun renameComponent(projectDir: Path, oldSlug: String, newSlug: String): Boolean {
+    fun renameComponent(
+        projectDir: Path,
+        oldSlug: String,
+        newSlug: String,
+    ): Boolean {
         val oldPath = projectDir.resolve("components").resolve("${oldSlug}$CFCOMP_EXT")
         val newPath = projectDir.resolve("components").resolve("${newSlug}$CFCOMP_EXT")
 
@@ -292,7 +323,10 @@ object ComponentRepository {
      * Возвращает null, если компонент не найден.
      * Использует lazy evaluation для экономии памяти.
      */
-    fun loadComponentById(projectDir: Path, componentId: String): Component? {
+    fun loadComponentById(
+        projectDir: Path,
+        componentId: String,
+    ): Component? {
         val componentsDir = projectDir.resolve("components")
         if (!Files.exists(componentsDir)) return null
         return try {
@@ -311,5 +345,4 @@ object ComponentRepository {
             null
         }
     }
-
 }

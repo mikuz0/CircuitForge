@@ -13,10 +13,11 @@ import java.nio.file.Path
 object NetRepository {
     private val logger = LoggerFactory.getLogger(NetRepository::class.java)
     private const val NETS_FILE_NAME = "nets.json"
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 
     /** Загружает netlist документ. Возвращает пустой при отсутствии. */
     fun load(paths: ProjectPaths): NetDocument {
@@ -29,12 +30,16 @@ object NetRepository {
             NetDocument()
         }
     }
+
     /**
      * Сохраняет netlist документ с валидацией.
      * @throws IllegalArgumentException если валидация не пройдена
      */
     @Throws(IllegalArgumentException::class)
-    fun save(paths: ProjectPaths, doc: NetDocument) {
+    fun save(
+        paths: ProjectPaths,
+        doc: NetDocument,
+    ) {
         val errors = validate(doc, paths)
         if (errors.isNotEmpty()) {
             val msg = "Validation errors:\n" + errors.joinToString("\n")
@@ -57,7 +62,10 @@ object NetRepository {
      * Валидирует netlist документ.
      * @return список сообщений об ошибках (пустой если всё ок)
      */
-    fun validate(doc: NetDocument, paths: ProjectPaths): List<String> {
+    fun validate(
+        doc: NetDocument,
+        paths: ProjectPaths,
+    ): List<String> {
         val errors = mutableListOf<String>()
 
         val netNames = doc.nets.map { it.name }
@@ -88,18 +96,19 @@ object NetRepository {
                     return@forEach
                 }
 
-                val component = componentCache.getOrPut(conn.refDes) {
-                    try {
-                        val bomItem = bomDoc.items.find { it.refDes == conn.refDes }
-                        if (bomItem != null) {
-                            ComponentRepository.loadComponent(paths.projectDir, bomItem.componentSlug)
-                        } else {
+                val component =
+                    componentCache.getOrPut(conn.refDes) {
+                        try {
+                            val bomItem = bomDoc.items.find { it.refDes == conn.refDes }
+                            if (bomItem != null) {
+                                ComponentRepository.loadComponent(paths.projectDir, bomItem.componentSlug)
+                            } else {
+                                null
+                            }
+                        } catch (e: Exception) {
                             null
                         }
-                    } catch (e: Exception) {
-                        null
                     }
-                }
 
                 component?.let { comp ->
                     val pinNumbers = comp.ports.map { it.pinNumber }.toSet()
@@ -118,7 +127,10 @@ object NetRepository {
      * Строки = цепи, колонки = все уникальные PortRef (refDes.pinNumber),
      * ячейки = "X" если связь существует.
      */
-    fun exportToCsv(paths: ProjectPaths, outputPath: Path) {
+    fun exportToCsv(
+        paths: ProjectPaths,
+        outputPath: Path,
+    ) {
         val doc = load(paths)
         if (doc.nets.isEmpty()) {
             logger.warn("Nothing to export: no nets defined")
@@ -141,14 +153,15 @@ object NetRepository {
 
         // Строки
         doc.nets.forEach { net ->
-            val values = sortedPortRefs.map { portRef ->
-                val (refDes, pinNumber) = portRef.split(".", limit = 2)
-                if (net.connections.any { it.refDes == refDes && it.pinNumber == pinNumber }) {
-                    "X"
-                } else {
-                    ""
+            val values =
+                sortedPortRefs.map { portRef ->
+                    val (refDes, pinNumber) = portRef.split(".", limit = 2)
+                    if (net.connections.any { it.refDes == refDes && it.pinNumber == pinNumber }) {
+                        "X"
+                    } else {
+                        ""
+                    }
                 }
-            }
             lines.add("${net.name},${values.joinToString(",")}")
         }
 

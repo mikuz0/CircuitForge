@@ -13,8 +13,9 @@ object AppPaths {
     const val CONFIG_DIR: String = "circuitforge"
 
     val configDir: Path by lazy {
-        val xdg = System.getenv("XDG_CONFIG_HOME")?.let { Paths.get(it) }
-            ?: Paths.get(System.getProperty("user.home"), ".config")
+        val xdg =
+            System.getenv("XDG_CONFIG_HOME")?.let { Paths.get(it) }
+                ?: Paths.get(System.getProperty("user.home"), ".config")
         xdg.resolve(CONFIG_DIR)
     }
 

@@ -4,15 +4,13 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.EncodeDefault.Mode.ALWAYS
 import kotlinx.serialization.Serializable
 
-
-
 /**
  * Подключение: привязка refDes к номеру пина.
  */
 @Serializable
 data class NetConnection(
     val refDes: String = "",
-    val pinNumber: String = ""
+    val pinNumber: String = "",
 )
 
 /**
@@ -23,7 +21,7 @@ data class Net(
     val name: String = "",
     @EncodeDefault(ALWAYS)
     val connections: List<NetConnection> = emptyList(),
-    var labelMode: Boolean = false
+    var labelMode: Boolean = false,
 )
 
 /**
@@ -33,5 +31,5 @@ data class Net(
 data class NetDocument(
     @EncodeDefault(ALWAYS) // <--- ДОБАВИТЬ ЭТУ СТРОКУ
     val schemaVersion: Int = 1,
-    val nets: List<Net> = emptyList()
+    val nets: List<Net> = emptyList(),
 )

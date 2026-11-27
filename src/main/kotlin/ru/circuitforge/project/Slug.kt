@@ -1,6 +1,5 @@
 package ru.circuitforge.project
 
-import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 
 /**
@@ -45,7 +44,10 @@ object Slug {
     }
 
     /** Гарантирует уникальность slug в списке компонентов. */
-    fun ensureUnique(slug: String, existing: List<Component>): String {
+    fun ensureUnique(
+        slug: String,
+        existing: List<Component>,
+    ): String {
         if (slug !in existing.map { it.refPrefix }) return slug
         var counter = 1
         var candidate = "$slug$counter"

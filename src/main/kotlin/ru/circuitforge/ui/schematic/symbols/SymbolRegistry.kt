@@ -1,8 +1,8 @@
 package ru.circuitforge.ui.schematic.symbols
 
-import org.slf4j.LoggerFactory
 import javafx.scene.Node
 import javafx.scene.layout.Pane
+import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
 /**
@@ -11,21 +11,21 @@ import java.nio.file.Path
  * Fallback — загрузка из resources.
  */
 class SymbolRegistry private constructor(
-    private val symbolLibrary: SymbolLibrary? = null
+    private val symbolLibrary: SymbolLibrary? = null,
 ) {
     private val logger = LoggerFactory.getLogger(SymbolRegistry::class.java)
-    
+
     companion object {
         @Volatile
         private var instance: SymbolRegistry? = null
-        
+
         @Synchronized
         fun getInstance(): SymbolRegistry {
             return instance ?: synchronized(this) {
                 instance ?: SymbolRegistry().also { instance = it }
             }
         }
-        
+
         @Synchronized
         fun initialize(projectDir: Path?) {
             instance = projectDir?.let {
@@ -44,23 +44,23 @@ class SymbolRegistry private constructor(
             try {
                 val symbolType = lib.getSymbolType(compName)
                 val pane = lib.getSymbolNode(symbolType)
-                
+
                 // Проверяем, не пустой ли Pane (fallback)
                 if (pane.children.isNotEmpty() || pane.style.isNotBlank()) {
                     logger.debug("Loaded symbol $compName (type=$symbolType) from SymbolLibrary")
                     return pane
                 }
-                
+
                 logger.debug("SymbolLibrary returned empty pane for $compName (type=$symbolType), trying resources")
             } catch (e: Exception) {
                 logger.debug("SymbolLibrary failed for $compName: ${e.message}", e)
             }
         }
-        
+
         // Fallback — загрузка из resources через старый метод
         return loadFromResources(compName)
     }
-    
+
     /**
      * Получает symbolType по имени компонента.
      * Использует mappings из SymbolLibrary, fallback — lowercase name.
@@ -69,7 +69,7 @@ class SymbolRegistry private constructor(
         return symbolLibrary?.getSymbolType(componentName)
             ?: componentName.lowercase()
     }
-    
+
     /**
      * Получает размеры символа.
      */
@@ -80,17 +80,20 @@ class SymbolRegistry private constructor(
         }
         return Pair(100.0, 80.0) // fallback
     }
-    
+
     /**
      * Получает позицию порта (x, y) относительно центра символа.
      */
-    fun getPortPosition(compName: String, pinNumber: String): Pair<Double, Double>? {
+    fun getPortPosition(
+        compName: String,
+        pinNumber: String,
+    ): Pair<Double, Double>? {
         return symbolLibrary?.let { lib ->
             val symbolType = lib.getSymbolType(compName)
             lib.getPortPosition(symbolType, pinNumber)
         }
     }
-    
+
     /**
      * Загружает SVG из resources (fallback).
      */
@@ -98,16 +101,17 @@ class SymbolRegistry private constructor(
         val registry = SymbolRegistry()
         val key = compName.lowercase().trim()
         val resourcePath = "/symbols/$key.svg"
-        
+
         return try {
             val inputStream = javaClass.getResourceAsStream(resourcePath)
             if (inputStream == null) {
                 logger.debug("SVG not found in resources: $resourcePath")
                 Pane()
             } else {
-                val svgString = inputStream.use { 
-                    it.readBytes().toString(Charsets.UTF_8) 
-                }
+                val svgString =
+                    inputStream.use {
+                        it.readBytes().toString(Charsets.UTF_8)
+                    }
                 val parser = SvgParser()
                 val pane = parser.parse(svgString)
                 pane.prefWidth = 100.0

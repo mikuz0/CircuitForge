@@ -1,6 +1,5 @@
 package ru.circuitforge.project
 
-import kotlinx.serialization.Serializable
 import java.time.Instant
 
 /**
@@ -10,7 +9,10 @@ import java.time.Instant
 object InstantSerializer : kotlinx.serialization.KSerializer<Instant> {
     override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("Instant", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
 
-    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: Instant) {
+    override fun serialize(
+        encoder: kotlinx.serialization.encoding.Encoder,
+        value: Instant,
+    ) {
         encoder.encodeString(value.toString())
     }
 

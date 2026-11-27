@@ -16,7 +16,7 @@ import ru.circuitforge.project.SchematicNode
  */
 data class SyncReport(
     val newRows: List<BomRow>,
-    val missingNodes: List<SchematicNode>
+    val missingNodes: List<SchematicNode>,
 )
 
 /**
@@ -24,7 +24,7 @@ data class SyncReport(
  */
 class SyncDialog(
     ownerStage: Stage,
-    private val report: SyncReport
+    private val report: SyncReport,
 ) {
     private val stage = Stage()
 
@@ -75,8 +75,9 @@ class SyncDialog(
             statusLabel.text = I18n.tr("schematic.sync.no.changes") ?: "Схема актуальна"
             (syncButton as Button).isDisable = true
         } else {
-            statusLabel.text = I18n.tr("schematic.sync.changes.found", totalChanges)
-                .replace("{0}", totalChanges.toString())
+            statusLabel.text =
+                I18n.tr("schematic.sync.changes.found", totalChanges)
+                    .replace("{0}", totalChanges.toString())
         }
 
         // Чекбоксы
@@ -105,44 +106,54 @@ class SyncDialog(
         val center = VBox(10.0)
 
         // Новые компоненты
-        val newLabel = Label(I18n.tr("schematic.sync.new.components", report.newRows.size))
-            .apply { style = "-fx-font-weight: bold;" }
-        val newScrollPane = ScrollPane(newComponentsList).apply {
-            prefHeight = 120.0
-            prefWidth = 560.0
-        }
-        val newSection = VBox(5.0, newLabel, newScrollPane).apply {
-            padding = Insets(5.0)
-            style = "-fx-border-color: #ddd; -fx-border-width: 1;"
-        }
+        val newLabel =
+            Label(I18n.tr("schematic.sync.new.components", report.newRows.size))
+                .apply { style = "-fx-font-weight: bold;" }
+        val newScrollPane =
+            ScrollPane(newComponentsList).apply {
+                prefHeight = 120.0
+                prefWidth = 560.0
+            }
+        val newSection =
+            VBox(5.0, newLabel, newScrollPane).apply {
+                padding = Insets(5.0)
+                style = "-fx-border-color: #ddd; -fx-border-width: 1;"
+            }
 
         // Отсутствующие компоненты
-        val missingLabel = Label(I18n.tr("schematic.sync.missing.components", report.missingNodes.size))
-            .apply { style = "-fx-font-weight: bold;" }
-        val missingScrollPane = ScrollPane(missingComponentsList).apply {
-            prefHeight = 80.0
-            prefWidth = 560.0
-        }
-        val missingSection = VBox(5.0, missingLabel, missingScrollPane).apply {
-            padding = Insets(5.0)
-            style = "-fx-border-color: #ddd; -fx-border-width: 1;"
-        }
+        val missingLabel =
+            Label(I18n.tr("schematic.sync.missing.components", report.missingNodes.size))
+                .apply { style = "-fx-font-weight: bold;" }
+        val missingScrollPane =
+            ScrollPane(missingComponentsList).apply {
+                prefHeight = 80.0
+                prefWidth = 560.0
+            }
+        val missingSection =
+            VBox(5.0, missingLabel, missingScrollPane).apply {
+                padding = Insets(5.0)
+                style = "-fx-border-color: #ddd; -fx-border-width: 1;"
+            }
 
         // Чекбоксы
-        val checkboxes = VBox(5.0, addNewCheckbox, removeMissingCheckbox).apply {
-            padding = Insets(5.0)
-        }
+        val checkboxes =
+            VBox(5.0, addNewCheckbox, removeMissingCheckbox).apply {
+                padding = Insets(5.0)
+            }
 
         // Размещение
-        val placementLabel = Label(I18n.tr("schematic.sync.placement.title"))
-            .apply { style = "-fx-font-weight: bold;" }
-        val placementOptions = VBox(5.0, placementNearRadio, placementFreeRadio).apply {
-            padding = Insets(5.0)
-        }
-        val placementSection = VBox(5.0, placementLabel, placementOptions).apply {
-            padding = Insets(5.0)
-            style = "-fx-border-color: #ddd; -fx-border-width: 1;"
-        }
+        val placementLabel =
+            Label(I18n.tr("schematic.sync.placement.title"))
+                .apply { style = "-fx-font-weight: bold;" }
+        val placementOptions =
+            VBox(5.0, placementNearRadio, placementFreeRadio).apply {
+                padding = Insets(5.0)
+            }
+        val placementSection =
+            VBox(5.0, placementLabel, placementOptions).apply {
+                padding = Insets(5.0)
+                style = "-fx-border-color: #ddd; -fx-border-width: 1;"
+            }
 
         // Добавляем слушатели для radio buttons
         placementNearRadio.selectedProperty().addListener { _, _, _ -> updateSyncButtonState() }
@@ -153,20 +164,22 @@ class SyncDialog(
         root.center = center
 
         // Bottom: buttons
-        val bottomBar = HBox(10.0, syncButton, cancelButton).apply {
-            alignment = Pos.CENTER_RIGHT
-            padding = Insets(10.0)
-            style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
-        }
+        val bottomBar =
+            HBox(10.0, syncButton, cancelButton).apply {
+                alignment = Pos.CENTER_RIGHT
+                padding = Insets(10.0)
+                style = "-fx-background-color: #fafafa; -fx-border-color: #ddd; -fx-border-width: 1 0 0 0;"
+            }
         root.bottom = bottomBar
 
         // Устанавливаем результат ДО закрытия
         syncButton.setOnAction {
-            _result = SyncResult(
-                addNew = addNewCheckbox.isSelected,
-                removeMissing = removeMissingCheckbox.isSelected,
-                placementNear = placementNearRadio.isSelected
-            )
+            _result =
+                SyncResult(
+                    addNew = addNewCheckbox.isSelected,
+                    removeMissing = removeMissingCheckbox.isSelected,
+                    placementNear = placementNearRadio.isSelected,
+                )
             stage.close()
         }
         cancelButton.setOnAction {
@@ -180,7 +193,7 @@ class SyncDialog(
     data class SyncResult(
         val addNew: Boolean,
         val removeMissing: Boolean,
-        val placementNear: Boolean
+        val placementNear: Boolean,
     )
 
     fun showAndWait(): SyncResult? {
