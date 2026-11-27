@@ -4,4 +4,35 @@ WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers i
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
 Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
+
 > Task :detekt
+.................................................
+
+49 kotlin files were analyzed.
+Complexity Report:
+	- 8,161 lines of code (loc)
+	- 6,382 source lines of code (sloc)
+	- 5,132 logical lines of code (lloc)
+	- 815 comment lines of code (cloc)
+	- 962 cyclomatic complexity (mcc)
+	- 831 cognitive complexity
+	- 0 number of total code smells
+	- 12% comment source ratio
+	- 187 mcc per 1,000 lloc
+	- 0 code smells per 1,000 lloc
+
+Project Statistics:
+	- number of properties: 1081
+	- number of functions: 332
+	- number of classes: 56
+	- number of packages: 10
+	- number of kt files: 49
+
+Successfully generated SARIF: a standard format for the output of static analysis tools at file:///home/mikuz/soft/IdeaProjects/CircuitForge/build/reports/detekt/detekt.sarif
+Successfully generated Checkstyle XML report at file:///home/mikuz/soft/IdeaProjects/CircuitForge/build/reports/detekt/detekt.xml
+Successfully generated plain text report at file:///home/mikuz/soft/IdeaProjects/CircuitForge/build/reports/detekt/detekt.txt
+Successfully generated HTML report at file:///home/mikuz/soft/IdeaProjects/CircuitForge/build/reports/detekt/detekt.html
+Successfully generated Markdown report at file:///home/mikuz/soft/IdeaProjects/CircuitForge/build/reports/detekt/detekt.md
+
+BUILD SUCCESSFUL in 16s
+1 actionable task: 1 executed

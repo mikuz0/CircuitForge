@@ -1,9 +1,14 @@
 package ru.circuitforge.project
 
-import org.junit.jupiter.api.Assertions.*
+import java.nio.file.Files
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Files
 
 class ComponentRepositoryTest {
     @TempDir
@@ -107,7 +112,8 @@ class ComponentRepositoryTest {
             ComponentRepository.saveComponent(
                 projectDir = paths.projectDir,
                 originalSlug = slug2,
-                name = "test-comp", // имя совпадает с первым компонентом
+                name = "test-comp",
+                // имя совпадает с первым компонентом
                 description = comp.description,
                 refPrefix = comp.refPrefix,
                 ports = comp.ports,

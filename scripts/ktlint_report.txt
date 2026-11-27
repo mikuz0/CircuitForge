@@ -3,24 +3,86 @@ WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.i
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-> Task :loadKtlintReporters
-> Task :runKtlintCheckOverKotlinScripts
-> Task :ktlintKotlinScriptCheck
-> Task :runKtlintCheckOverTestSourceSet
+> Task :loadKtlintReporters UP-TO-DATE
+> Task :runKtlintCheckOverKotlinScripts UP-TO-DATE
+> Task :ktlintKotlinScriptCheck UP-TO-DATE
+> Task :runKtlintCheckOverMainSourceSet UP-TO-DATE
+> Task :runKtlintCheckOverTestSourceSet UP-TO-DATE
+
+> Task :ktlintMainSourceSetCheck FAILED
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/app/MainApp.kt:4:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/app/MainApp.kt:5:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/i18n/I18n.kt:3:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/project/ComponentRepository.kt:103:31 A comment in a 'value_parameter_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/project/ComponentRepository.kt:145:34 A comment in a 'value_argument_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/project/ComponentRepository.kt:205:54 A comment in a 'value_argument_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/project/InstantSerializer.kt:10:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/project/NetDocument.kt:32:28 A (block or EOL) comment inside or on same line after a 'value_parameter' is not allowed. It may be placed on a separate line above. (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:9:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:18:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:522:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:524:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:542:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:575:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:583:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:678:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/components/ComponentsWindow.kt:696:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/editor/AddBomItemDialog.kt:7:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/editor/AddBomItemDialog.kt:11:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/editor/AddBomItemDialog.kt:16:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/editor/BomWindow.kt:7:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/editor/BomWindow.kt:8:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/editor/BomWindow.kt:12:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/editor/BomWindow.kt:298:33 A comment in a 'value_argument_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/AddConnectionDialog.kt:8:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/AddConnectionDialog.kt:12:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/AddConnectionDialog.kt:17:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/NetWindow.kt:7:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/NetWindow.kt:8:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/NetWindow.kt:13:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/NetWindow.kt:330:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/NetWindow.kt:747:1 a KDoc may not be preceded by a KDoc (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/nets/NetWindow.kt:750:38 A comment in a 'value_parameter_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/projects/ProjectsView.kt:6:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/projects/ProjectsView.kt:7:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SchematicExporter.kt:4:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SchematicExporter.kt:60:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SchematicWindow.kt:16:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SchematicWindow.kt:23:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SchematicWindow.kt:405:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/symbols/SymbolConfig.kt:20:23 A comment in a 'value_parameter_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/symbols/SymbolConfig.kt:21:31 A comment in a 'value_parameter_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/symbols/SymbolConfig.kt:22:32 A comment in a 'value_parameter_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/symbols/SymbolConfig.kt:23:58 A comment in a 'value_parameter_list' is only allowed when placed on a separate line (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/symbols/SymbolLibrary.kt:55:1 Exceeded max line length (140) (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SyncDialog.kt:6:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SyncDialog.kt:7:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/SyncDialog.kt:44:17 Property name should start with a lowercase letter and use camel case (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/main/kotlin/ru/circuitforge/ui/schematic/WireEditor.kt:1:1 File 'WireEditor.kt' should not be empty (cannot be auto-corrected)
 
 > Task :ktlintTestSourceSetCheck FAILED
-/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/BomRepositoryTest.kt:4:1 Wildcard import (cannot be auto-corrected)
-/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/BomRepositoryTest.kt:39:1 Exceeded max line length (140) (cannot be auto-corrected)
-/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ComponentRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
-/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ComponentRepositoryTest.kt:110:37 A comment in a 'value_argument_list' is only allowed when placed on a separate line (cannot be auto-corrected)
-/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/NetRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
-/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ProjectRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
-/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/SchematicRepositoryTest.kt:3:1 Wildcard import (cannot be auto-corrected)
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ComponentRepositoryTest.kt:3:1 Imports must be ordered in lexicographic order without any empty lines in-between with "java", "javax", "kotlin" and aliases in the end
+/home/mikuz/soft/IdeaProjects/CircuitForge/src/test/kotlin/ru/circuitforge/project/ProjectRepositoryTest.kt:3:1 Imports must be ordered in lexicographic order without any empty lines in-between with "java", "javax", "kotlin" and aliases in the end
 
-> Task :runKtlintCheckOverMainSourceSet
+FAILURE: Build completed with 2 failures.
 
-FAILURE: Build failed with an exception.
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':ktlintMainSourceSetCheck'.
+> A failure occurred while executing org.jlleitschuh.gradle.ktlint.worker.ConsoleReportWorkAction
+   > KtLint found code style violations. Please see the following reports:
+     - /home/mikuz/soft/IdeaProjects/CircuitForge/build/reports/ktlint/ktlintMainSourceSetCheck/ktlintMainSourceSetCheck.txt
 
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
 * What went wrong:
 Execution failed for task ':ktlintTestSourceSetCheck'.
 > A failure occurred while executing org.jlleitschuh.gradle.ktlint.worker.ConsoleReportWorkAction
@@ -32,6 +94,7 @@ Execution failed for task ':ktlintTestSourceSetCheck'.
 > Run with --info or --debug option to get more log output.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
+==============================================================================
 
-BUILD FAILED in 7s
-6 actionable tasks: 6 executed
+BUILD FAILED in 1s
+7 actionable tasks: 2 executed, 5 up-to-date

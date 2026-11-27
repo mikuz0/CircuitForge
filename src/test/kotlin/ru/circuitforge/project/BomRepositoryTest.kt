@@ -1,7 +1,9 @@
 package ru.circuitforge.project
 
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
@@ -35,8 +37,20 @@ class BomRepositoryTest {
                 schemaVersion = 1,
                 items =
                     listOf(
-                        BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k"),
-                        BomItem(number = 2, refDes = "C1", componentId = "uuid-2", componentSlug = "capacitor-10uf", comment = "10uF electrolytic"),
+                        BomItem(
+                            number = 1,
+                            refDes = "R1",
+                            componentId = "uuid-1",
+                            componentSlug = "resistor-0603",
+                            comment = "10k",
+                        ),
+                        BomItem(
+                            number = 2,
+                            refDes = "C1",
+                            componentId = "uuid-2",
+                            componentSlug = "capacitor-10uf",
+                            comment = "10uF electrolytic",
+                        ),
                     ),
             )
 
@@ -102,7 +116,13 @@ class BomRepositoryTest {
                 schemaVersion = 1,
                 items =
                     listOf(
-                        BomItem(number = 1, refDes = "R1", componentId = "uuid-1", componentSlug = "resistor-0603", comment = "10k"),
+                        BomItem(
+                            number = 1,
+                            refDes = "R1",
+                            componentId = "uuid-1",
+                            componentSlug = "resistor-0603",
+                            comment = "10k",
+                        ),
                     ),
             )
 
