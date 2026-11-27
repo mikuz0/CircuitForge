@@ -742,11 +742,11 @@ class NetWindow : ProjectAware {
     }
 }
 
-/** Ячейка матрицы связей. */
-
-/** Ячейка матрицы связей. Одна строка = одна цепь. */
+/**
+ * Ячейка матрицы связей. Одна строка = одна цепь.
+ */
 data class NetMatrixCell(
     val netName: String,
-    val connectedPorts: Set<String>, // например, setOf("DD2.1", "R5.1")
+    val connectedPorts: Set<String>,
     val net: Net,
 )

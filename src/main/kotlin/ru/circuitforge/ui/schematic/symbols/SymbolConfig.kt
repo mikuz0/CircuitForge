@@ -17,10 +17,10 @@ data class SymbolConfig(
  */
 @Serializable
 data class SymbolDefinition(
-    val file: String, // имя SVG файла (относительно symbolsDir)
-    val width: Double = 80.0, // ширина символа
-    val height: Double = 40.0, // высота символа
-    val ports: Map<String, PortDefinition> = emptyMap(), // pinNumber → позиция
+    val file: String,
+    val width: Double = 80.0,
+    val height: Double = 40.0,
+    val ports: Map<String, PortDefinition> = emptyMap(),
 )
 
 /**

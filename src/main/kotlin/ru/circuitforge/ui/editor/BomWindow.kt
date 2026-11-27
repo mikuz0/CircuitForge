@@ -295,7 +295,7 @@ class BomWindow : ProjectAware {
             val newRow =
                 BomRow(
                     bomnetId = UUID.randomUUID().toString(),
-                    number = 0, // Пересчитается при сохранении
+                    number = 0,
                     refDes = newRefDes,
                     componentId = selectedComponent.componentId,
                     componentSlug = selectedComponent.componentSlug,

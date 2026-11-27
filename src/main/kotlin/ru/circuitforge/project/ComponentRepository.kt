@@ -100,7 +100,7 @@ object ComponentRepository {
      */
     fun saveComponent(
         projectDir: Path,
-        originalSlug: String, // Фактически это имя файла (без .cfcomp)
+        originalSlug: String,
         name: String,
         description: String,
         refPrefix: String,
@@ -142,7 +142,7 @@ object ComponentRepository {
         val component =
             Component(
                 schemaVersion = 1,
-                id = existingId, // <-- СОХРАНЯЕМ СТАРЫЙ ID
+                id = existingId,
                 name = name,
                 description = description,
                 refPrefix = refPrefix,
@@ -202,7 +202,7 @@ object ComponentRepository {
                             val summary =
                                 ComponentSummary(
                                     id = comp.id,
-                                    slug = fileSlug, // Используем имя файла
+                                    slug = fileSlug,
                                     name = comp.name,
                                     description = comp.description,
                                     refPrefix = comp.refPrefix,

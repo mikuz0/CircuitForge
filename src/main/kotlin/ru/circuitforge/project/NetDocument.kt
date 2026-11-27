@@ -29,7 +29,7 @@ data class Net(
  */
 @Serializable
 data class NetDocument(
-    @EncodeDefault(ALWAYS) // <--- ДОБАВИТЬ ЭТУ СТРОКУ
+    @EncodeDefault(ALWAYS)
     val schemaVersion: Int = 1,
     val nets: List<Net> = emptyList(),
 )
