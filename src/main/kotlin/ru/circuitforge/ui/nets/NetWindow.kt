@@ -63,6 +63,9 @@ class NetWindow : ProjectAware {
     // Текущая выбранная цепь
     private var selectedNetIndex: Int = -1
 
+    // Кэш: refDes -> Map<pinNumber, portName>
+    private val portNamesCache = mutableMapOf<String, Map<String, String>>()
+
     init {
         stage.title = I18n.tr("net.window.title")
         setupNetTable()
@@ -140,13 +143,22 @@ class NetWindow : ProjectAware {
     private fun setupConnectionTable() {
         val refDesCol = TableColumn<NetConnection, String>(I18n.tr("net.col.ref.des"))
         refDesCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.refDes) }
-        refDesCol.prefWidth = 200.0
+        refDesCol.prefWidth = 180.0
 
         val pinCol = TableColumn<NetConnection, String>(I18n.tr("net.col.pin.number"))
         pinCol.setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.pinNumber) }
-        pinCol.prefWidth = 150.0
+        pinCol.prefWidth = 100.0
 
-        connectionsTable.columns.setAll(refDesCol, pinCol)
+        val portNameCol = TableColumn<NetConnection, String>(I18n.tr("net.col.port.name"))
+        portNameCol.setCellValueFactory { cellData ->
+            val conn = cellData.value
+            val portNames = portNamesCache[conn.refDes] ?: emptyMap()
+            val portName = portNames[conn.pinNumber] ?: ""
+            javafx.beans.property.SimpleStringProperty(portName)
+        }
+        portNameCol.prefWidth = 150.0
+
+        connectionsTable.columns.setAll(refDesCol, pinCol, portNameCol)
         connectionsTable.items = connectionsList
     }
 
@@ -214,11 +226,38 @@ class NetWindow : ProjectAware {
                 selectedNetIndex = nets.indexOf(selectedNet)
                 connectionsLabel.text = "${I18n.tr("net.label.connections.for")} '${selectedNet.name}'"
                 connectionsList.setAll(selectedNet.connections.toList())
+                loadPortNamesCache()
             } else {
                 connectionsList.clear()
                 selectedNetIndex = -1
+                portNamesCache.clear()
             }
         }
+    }
+
+    /** Загружает кэш имён портов для всех компонентов в текущих соединениях. */
+    private fun loadPortNamesCache() {
+        val paths = projectPaths ?: return
+        val cache = mutableMapOf<String, Map<String, String>>()
+        val refDesSet = connectionsList.map { it.refDes }.distinct()
+
+        refDesSet.forEach { refDes ->
+            try {
+                val bomRows = BomRepository.loadRows(paths)
+                val bomRow = bomRows.find { it.refDes == refDes }
+                if (bomRow != null) {
+                    val comp = ComponentRepository.loadComponentById(paths.projectDir, bomRow.componentId)
+                    if (comp != null) {
+                        cache[refDes] = comp.ports.associateBy({ it.pinNumber }, { it.name })
+                    }
+                }
+            } catch (e: Exception) {
+                logger.warn("Failed to load component for refDes=$refDes", e)
+            }
+        }
+
+        portNamesCache.clear()
+        portNamesCache.putAll(cache)
     }
 
     private fun setupToolbar() {
