@@ -21,6 +21,7 @@ import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.ProjectAware
 import ru.circuitforge.ui.common.UiUtils
+import ru.circuitforge.ui.common.setupEditableCell
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.Executors
@@ -37,11 +38,8 @@ class ComponentsWindow : ProjectAware {
 
     private val componentList = FXCollections.observableArrayList<ComponentSummary>()
     private val portList = FXCollections.observableArrayList<Port>()
-    private var originalPortList = FXCollections.observableArrayList<Port>()
     private val mainPropertyList = FXCollections.observableArrayList<Property>()
-    private var originalMainPropertyList = FXCollections.observableArrayList<Property>()
     private val extraPropertyList = FXCollections.observableArrayList<Property>()
-    private var originalExtraPropertyList = FXCollections.observableArrayList<Property>()
 
     private val componentTable = TableView<ComponentSummary>()
     private val portTable = TableView<Port>()
@@ -289,25 +287,7 @@ class ComponentsWindow : ProjectAware {
         val pinCol = TableColumn<Port, String>(I18n.tr("components.col.pin")).apply {
             isEditable = true; prefWidth = 100.0
             setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.pinNumber) }
-            cellFactory = Callback { _: TableColumn<Port, String> ->
-                object : TableCell<Port, String>() {
-                    private val tf = TextField()
-                    init {
-                        tf.setOnAction { commitEdit(tf.text) }
-                        tf.focusedProperty().addListener { _, _, focused ->
-                            if (!focused) commitEdit(tf.text)
-                        }
-                    }
-                    override fun startEdit() { super.startEdit(); tf.text = item ?: ""; graphic = tf; text = null; tf.requestFocus(); tf.selectAll() }
-                    override fun cancelEdit() { super.cancelEdit(); text = item; graphic = null }
-                    override fun updateItem(item: String?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        if (empty || item == null) { text = null; graphic = null }
-                        else if (isEditing) { tf.text = item; graphic = tf; text = null }
-                        else { text = item; graphic = null }
-                    }
-                }
-            }
+            setupEditableCell()
             setOnEditCommit { event ->
                 val port = event.rowValue
                 val newPin = event.newValue?.trim() ?: ""
@@ -323,25 +303,7 @@ class ComponentsWindow : ProjectAware {
         val nameCol = TableColumn<Port, String>(I18n.tr("components.col.port.name")).apply {
             isEditable = true; prefWidth = 150.0
             setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.name) }
-            cellFactory = Callback { _: TableColumn<Port, String> ->
-                object : TableCell<Port, String>() {
-                    private val tf = TextField()
-                    init {
-                        tf.setOnAction { commitEdit(tf.text) }
-                        tf.focusedProperty().addListener { _, _, focused ->
-                            if (!focused) commitEdit(tf.text)
-                        }
-                    }
-                    override fun startEdit() { super.startEdit(); tf.text = item ?: ""; graphic = tf; text = null; tf.requestFocus(); tf.selectAll() }
-                    override fun cancelEdit() { super.cancelEdit(); text = item; graphic = null }
-                    override fun updateItem(item: String?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        if (empty || item == null) { text = null; graphic = null }
-                        else if (isEditing) { tf.text = item; graphic = tf; text = null }
-                        else { text = item; graphic = null }
-                    }
-                }
-            }
+            setupEditableCell()
             setOnEditCommit { event ->
                 val port = event.rowValue
                 val newName = event.newValue?.trim() ?: ""
@@ -352,25 +314,7 @@ class ComponentsWindow : ProjectAware {
         val descCol = TableColumn<Port, String>(I18n.tr("components.col.port.description")).apply {
             isEditable = true; prefWidth = 200.0
             setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.description) }
-            cellFactory = Callback { _: TableColumn<Port, String> ->
-                object : TableCell<Port, String>() {
-                    private val tf = TextField()
-                    init {
-                        tf.setOnAction { commitEdit(tf.text) }
-                        tf.focusedProperty().addListener { _, _, focused ->
-                            if (!focused) commitEdit(tf.text)
-                        }
-                    }
-                    override fun startEdit() { super.startEdit(); tf.text = item ?: ""; graphic = tf; text = null; tf.requestFocus(); tf.selectAll() }
-                    override fun cancelEdit() { super.cancelEdit(); text = item; graphic = null }
-                    override fun updateItem(item: String?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        if (empty || item == null) { text = null; graphic = null }
-                        else if (isEditing) { tf.text = item; graphic = tf; text = null }
-                        else { text = item; graphic = null }
-                    }
-                }
-            }
+            setupEditableCell()
             setOnEditCommit { event ->
                 val port = event.rowValue
                 val newDesc = event.newValue?.trim() ?: ""
@@ -387,25 +331,7 @@ class ComponentsWindow : ProjectAware {
         val keyCol = TableColumn<Property, String>(I18n.tr("components.label.property.key")).apply {
             isEditable = true; prefWidth = 150.0
             setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.key) }
-            cellFactory = Callback { _: TableColumn<Property, String> ->
-                object : TableCell<Property, String>() {
-                    private val tf = TextField()
-                    init {
-                        tf.setOnAction { commitEdit(tf.text) }
-                        tf.focusedProperty().addListener { _, _, focused ->
-                            if (!focused) commitEdit(tf.text)
-                        }
-                    }
-                    override fun startEdit() { super.startEdit(); tf.text = item ?: ""; graphic = tf; text = null; tf.requestFocus(); tf.selectAll() }
-                    override fun cancelEdit() { super.cancelEdit(); text = item; graphic = null }
-                    override fun updateItem(item: String?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        if (empty || item == null) { text = null; graphic = null }
-                        else if (isEditing) { tf.text = item; graphic = tf; text = null }
-                        else { text = item; graphic = null }
-                    }
-                }
-            }
+            setupEditableCell()
             setOnEditCommit { event ->
                 val prop = event.rowValue
                 val newKey = event.newValue?.trim() ?: ""
@@ -429,25 +355,7 @@ class ComponentsWindow : ProjectAware {
         val valueCol = TableColumn<Property, String>(I18n.tr("components.label.property.value")).apply {
             isEditable = true; prefWidth = 200.0
             setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.value) }
-            cellFactory = Callback { _: TableColumn<Property, String> ->
-                object : TableCell<Property, String>() {
-                    private val tf = TextField()
-                    init {
-                        tf.setOnAction { commitEdit(tf.text) }
-                        tf.focusedProperty().addListener { _, _, focused ->
-                            if (!focused) commitEdit(tf.text)
-                        }
-                    }
-                    override fun startEdit() { super.startEdit(); tf.text = item ?: ""; graphic = tf; text = null; tf.requestFocus(); tf.selectAll() }
-                    override fun cancelEdit() { super.cancelEdit(); text = item; graphic = null }
-                    override fun updateItem(item: String?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        if (empty || item == null) { text = null; graphic = null }
-                        else if (isEditing) { tf.text = item; graphic = tf; text = null }
-                        else { text = item; graphic = null }
-                    }
-                }
-            }
+            setupEditableCell()
             setOnEditCommit { event ->
                 val prop = event.rowValue
                 val newValue = event.newValue?.trim() ?: ""
@@ -458,25 +366,7 @@ class ComponentsWindow : ProjectAware {
         val unitCol = TableColumn<Property, String>(I18n.tr("components.label.property.unit")).apply {
             isEditable = true; prefWidth = 100.0
             setCellValueFactory { javafx.beans.property.SimpleStringProperty(it.value.unit) }
-            cellFactory = Callback { _: TableColumn<Property, String> ->
-                object : TableCell<Property, String>() {
-                    private val tf = TextField()
-                    init {
-                        tf.setOnAction { commitEdit(tf.text) }
-                        tf.focusedProperty().addListener { _, _, focused ->
-                            if (!focused) commitEdit(tf.text)
-                        }
-                    }
-                    override fun startEdit() { super.startEdit(); tf.text = item ?: ""; graphic = tf; text = null; tf.requestFocus(); tf.selectAll() }
-                    override fun cancelEdit() { super.cancelEdit(); text = item; graphic = null }
-                    override fun updateItem(item: String?, empty: Boolean) {
-                        super.updateItem(item, empty)
-                        if (empty || item == null) { text = null; graphic = null }
-                        else if (isEditing) { tf.text = item; graphic = tf; text = null }
-                        else { text = item; graphic = null }
-                    }
-                }
-            }
+            setupEditableCell()
             setOnEditCommit { event ->
                 val prop = event.rowValue
                 val newUnit = event.newValue?.trim() ?: ""
@@ -541,8 +431,7 @@ class ComponentsWindow : ProjectAware {
                 val (slug, usedInBom) = value; editingComponentSlug = slug
                 projectPaths?.let { paths -> componentList.setAll(ComponentRepository.listComponents(paths.projectDir)) }
                 clearComponentForm()
-                portList.clear(); originalPortList.clear(); mainPropertyList.clear(); originalMainPropertyList.clear()
-                extraPropertyList.clear(); originalExtraPropertyList.clear()
+                portList.clear(); mainPropertyList.clear(); extraPropertyList.clear()
                 if (usedInBom) {
                     val alert = Alert(Alert.AlertType.WARNING)
                     alert.title = "Внимание"; alert.headerText = "Компонент используется в BOM"
@@ -590,9 +479,8 @@ class ComponentsWindow : ProjectAware {
             override fun call() { projectPaths?.let { paths -> ComponentRepository.deleteComponent(paths.projectDir, selected.slug) } }
         }
         task.setOnSucceeded {
-            componentList.remove(selected); portList.clear(); originalPortList.clear()
-            mainPropertyList.clear(); originalMainPropertyList.clear()
-            extraPropertyList.clear(); originalExtraPropertyList.clear()
+            componentList.remove(selected); portList.clear()
+            mainPropertyList.clear(); extraPropertyList.clear()
             clearComponentForm(); logger.info("Component deleted: ${selected.name}")
         }
         task.setOnFailed { UiUtils.errorAlert(I18n.tr("components.alert.delete.failed"), task.exception?.message ?: I18n.tr("common.alert.unknown.error")); logger.error("Failed to delete component", task.exception) }
@@ -659,20 +547,18 @@ class ComponentsWindow : ProjectAware {
             if (Files.exists(compPath)) {
                 try {
                     val component = ComponentRepository.load(compPath)
-                    portList.setAll(component.ports); originalPortList.setAll(component.ports)
-                    mainPropertyList.setAll(component.mainProperties); originalMainPropertyList.setAll(component.mainProperties)
-                    extraPropertyList.setAll(component.extraProperties); originalExtraPropertyList.setAll(component.extraProperties)
+                    portList.setAll(component.ports)
+                    mainPropertyList.setAll(component.mainProperties)
+                    extraPropertyList.setAll(component.extraProperties)
                     isDirty = false
                     logger.info("Component loaded, ports: ${component.ports.size}, mainProps: ${component.mainProperties.size}, extraProps: ${component.extraProperties.size}")
                 } catch (e: Exception) {
                     logger.error("Failed to load component from $compPath", e)
-                    portList.clear(); originalPortList.clear(); mainPropertyList.clear(); originalMainPropertyList.clear()
-                    extraPropertyList.clear(); originalExtraPropertyList.clear()
+                    portList.clear(); mainPropertyList.clear(); extraPropertyList.clear()
                 }
             } else {
                 logger.warn("Component file not found: $compPath")
-                portList.clear(); originalPortList.clear(); mainPropertyList.clear(); originalMainPropertyList.clear()
-                extraPropertyList.clear(); originalExtraPropertyList.clear()
+                portList.clear(); mainPropertyList.clear(); extraPropertyList.clear()
             }
         }
     }
@@ -712,7 +598,6 @@ class ComponentsWindow : ProjectAware {
     }
 
     private fun markDirty() { isDirty = true }
-    private fun isDirty(): Boolean = isDirty
 
     override fun showWindow() = stage.show()
 

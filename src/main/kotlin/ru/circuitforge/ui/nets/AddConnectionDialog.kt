@@ -15,6 +15,23 @@ import org.slf4j.LoggerFactory
 import ru.circuitforge.i18n.I18n
 import ru.circuitforge.project.*
 import ru.circuitforge.ui.common.UiUtils
+import javafx.beans.value.ChangeListener
+
+/**
+ * Отображение пина в ComboBox с именем контакта.
+ */
+data class PinDisplay(
+    val pinNumber: String,
+    val portName: String
+) {
+    override fun toString(): String {
+        return if (portName.isNotBlank()) {
+            "$pinNumber ($portName)"
+        } else {
+            pinNumber
+        }
+    }
+}
 
 /**
  * Диалог добавления соединения к текущей цепи.
@@ -34,7 +51,7 @@ class AddConnectionDialog(
     private val bomRows = mutableListOf<BomRow>()
     private val componentsMap = mutableMapOf<String, Component>()
     private val searchStrings = mutableMapOf<BomRow, String>()
-    private val pinNumbersMap = mutableMapOf<String, List<String>>() // refDes -> List<pinNumber>
+    private val pinOptionsMap = mutableMapOf<String, List<PinDisplay>>() // refDes -> List<PinDisplay>
 
     // UI
     private val stage = Stage()
@@ -48,7 +65,7 @@ class AddConnectionDialog(
     private val cancelButton = Button(I18n.tr("nets.dialog.add.connection.cancel") ?: "Отмена")
 
     // Состояние
-    private val selectedPins = mutableMapOf<String, String?>()
+    private val selectedPins = mutableMapOf<String, PinDisplay?>()
 
     init {
         stage.initOwner(ownerStage)
@@ -84,13 +101,17 @@ class AddConnectionDialog(
                     val comp = ComponentRepository.loadComponentById(projectPaths.projectDir, row.componentId)
                     if (comp != null) {
                         componentsMap[row.componentId] = comp
-                        pinNumbersMap[row.refDes] = comp.ports.map { it.pinNumber }
+                        // Создаём PinDisplay для каждого порта
+                        val pinDisplays = comp.ports.map { port ->
+                            PinDisplay(pinNumber = port.pinNumber, portName = port.name)
+                        }
+                        pinOptionsMap[row.refDes] = pinDisplays
                     } else {
-                        pinNumbersMap[row.refDes] = emptyList()
+                        pinOptionsMap[row.refDes] = emptyList()
                     }
                 } catch (e: Exception) {
                     logger.warn("Failed to load component for refDes=${row.refDes}", e)
-                    pinNumbersMap[row.refDes] = emptyList()
+                    pinOptionsMap[row.refDes] = emptyList()
                 }
                 searchStrings[row] = buildSearchString(row)
             }
@@ -186,9 +207,20 @@ class AddConnectionDialog(
         pinCol.isEditable = false
         pinCol.setCellFactory {
             object : TableCell<BomRow, String>() {
-                private val comboBox = ComboBox<String>().apply {
+                private val comboBox = ComboBox<PinDisplay>().apply {
                     isEditable = true
                     promptText = "—"
+                }
+
+                init {
+                    comboBox.cellFactory = javafx.util.Callback { 
+                        object : ListCell<PinDisplay>() {
+                            override fun updateItem(item: PinDisplay?, empty: Boolean) {
+                                super.updateItem(item, empty)
+                                text = if (empty || item == null) null else item.toString()
+                            }
+                        }
+                    }
                 }
 
                 override fun updateItem(item: String?, empty: Boolean) {
@@ -199,7 +231,7 @@ class AddConnectionDialog(
                         val row = tableRow.item
                         if (row != null) {
                             val refDes = row.refDes
-                            val pins = pinNumbersMap[refDes] ?: emptyList()
+                            val pins = pinOptionsMap[refDes] ?: emptyList()
 
                             if (pins.isEmpty()) {
                                 comboBox.promptText = I18n.tr("nets.dialog.add.connection.pin.not.found")
@@ -212,25 +244,14 @@ class AddConnectionDialog(
 
                             // Устанавливаем текущее выбранное значение
                             val currentPin = selectedPins[refDes]
-                            if (currentPin != null && pins.contains(currentPin)) {
-                                comboBox.value = currentPin
-                            } else {
-                                comboBox.value = null
-                            }
+                            comboBox.selectionModel.select(currentPin)
 
-                            // Обновляем список пинов при выборе строки
-                            comboBox.items.clear()
-                            comboBox.items.setAll(pins)
-                            if (pins.isNotEmpty()) {
-                                comboBox.promptText = I18n.tr("nets.dialog.add.connection.filter.all")
-                                    ?: "Все"
-                            }
-
-                            // При изменении значения сохраняем
-                            comboBox.valueProperty().addListener { _, _, newValue ->
+                            // Создаём слушатель (при пересоздании ячейки старый listener автоматически detached)
+                            val listener = ChangeListener<PinDisplay> { _, _, newValue ->
                                 selectedPins[refDes] = newValue
                                 updateAddButtonState()
                             }
+                            comboBox.selectionModel.selectedItemProperty().addListener(listener)
 
                             graphic = comboBox
                         } else {
@@ -333,14 +354,15 @@ class AddConnectionDialog(
             (addButton as javafx.scene.control.Button).isDisable = true
             return
         }
-        val pin = selectedPins[selection.refDes]
-        (addButton as javafx.scene.control.Button).isDisable = pin.isNullOrBlank()
+        val pinDisplay = selectedPins[selection.refDes]
+        (addButton as javafx.scene.control.Button).isDisable = pinDisplay == null || pinDisplay.pinNumber.isBlank()
     }
 
     // ─── Добавление соединения ────────────────────────────────────
 
     private fun confirmSelection(row: BomRow) {
-        val pin = selectedPins[row.refDes] ?: return
+        val pinDisplay = selectedPins[row.refDes] ?: return
+        val pin = pinDisplay.pinNumber
 
         // Проверка: пин уже в текущей цепи — можно добавить дубликат (визуально)
         // Проверка: пин занят в другой цепи

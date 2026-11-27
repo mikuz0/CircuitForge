@@ -18,7 +18,7 @@ data class BomDocument(
  */
 @Serializable
 data class BomItem(
-    val bomnetId: String = java.util.UUID.randomUUID().toString(),
+    val bomnetId: String = "",
     val number: Int = 0,
     val refDes: String = "",
     val componentId: String = "",

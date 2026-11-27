@@ -115,13 +115,9 @@ object ComponentRepository {
 
         // 2. Генерируем новое имя файла
         // Загружаем компонент и сравниваем имя — если имя не изменилось, сохраняем текущий slug
-        val oldName = if (Files.exists(oldPath)) {
-            try { load(oldPath).name } catch (e: Exception) { null }
-        } else {
-            null
-        }
+        val oldName = runCatching { load(oldPath).name }.getOrNull()
         val generatedSlug = generateSlug(name)
-        val newSlug = if (oldName != null && oldName == name) {
+        val newSlug = if (oldName != null && oldName.trim() == name.trim()) {
             // Имя компонента не изменилось — пользователь мог переименовать файл вручную
             // Сохраняем текущий slug (originalSlug)
             originalSlug
@@ -143,31 +139,15 @@ object ComponentRepository {
             extraProperties = extraProperties
         )
 
-        // 4. Переименовываем файл при необходимости
+        // 4. Сначала сохраняем данные в новый файл
+        save(newPath, component)
+
+        // 5. После успешного сохранения — удаляем старый файл при необходимости
         if (originalSlug != newSlug && Files.exists(oldPath)) {
-            Files.move(oldPath, newPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            Files.delete(oldPath)
             logger.info("Component file renamed: $originalSlug -> $newSlug")
         }
-
-        // 5. Сохраняем
-        save(newPath, component)
         return newSlug
-    }
-
-    /** Проверяет конфликт имён компонентов. */
-    private fun hasNameConflict(componentsDir: Path, excludeSlug: String, name: String): Boolean {
-        return try {
-            Files.list(componentsDir).use { stream ->
-                stream.filter { it.fileName.toString().endsWith(CFCOMP_EXT) }
-                    .anyMatch { path ->
-                        val fileName = path.fileName.toString().removeSuffix(CFCOMP_EXT)
-                        fileName != excludeSlug && fileName == name
-                    }
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to check name conflict for '$name'", e)
-            false
-        }
     }
 
     /**
@@ -310,20 +290,22 @@ object ComponentRepository {
     /**
      * Находит компонент по его UUID, сканируя папку components.
      * Возвращает null, если компонент не найден.
+     * Использует lazy evaluation для экономии памяти.
      */
     fun loadComponentById(projectDir: Path, componentId: String): Component? {
         val componentsDir = projectDir.resolve("components")
         if (!Files.exists(componentsDir)) return null
         return try {
+            val results = mutableListOf<Component>()
             Files.list(componentsDir).use { stream ->
-                stream.toList()
-                    .filter { it.fileName.toString().endsWith(CFCOMP_EXT) }
-                    .map { path ->
-                        try { load(path) } catch (e: Exception) { null }
+                stream.filter { it.fileName.toString().endsWith(CFCOMP_EXT) }
+                    .forEach { path ->
+                        runCatching { load(path) }.getOrNull()
+                            ?.takeIf { it.id == componentId }
+                            ?.let { results.add(it) }
                     }
-                    .filterNotNull()
-                    .firstOrNull { it.id == componentId }
             }
+            results.firstOrNull()
         } catch (e: Exception) {
             logger.error("Failed to find component by id: $componentId", e)
             null

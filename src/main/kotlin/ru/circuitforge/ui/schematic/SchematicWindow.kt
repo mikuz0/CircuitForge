@@ -45,16 +45,14 @@ class SchematicWindow : ProjectAware {
     private val bomRows = FXCollections.observableArrayList<BomRow>()
     private val nets = FXCollections.observableArrayList<Net>()
     private val schematicNodes = FXCollections.observableArrayList<SchematicNode>()
-    private val schematicWires = FXCollections.observableArrayList<WireConnection>()
 
     // Map для быстрого доступа
     private val nodesMap = mutableMapOf<String, SchematicNode>()
     private val bomRowsMap = mutableMapOf<String, BomRow>()
     private val componentsMap = mutableMapOf<String, Component>()
 
-    // UI контейнеры — 6 слоёв
+    // UI контейнеры — 5 слоёв
     private val canvas = Canvas(5000.0, 5000.0)          // задний: сетка
-    private val wirePane = Pane()                        // слой для проводов из ELK (Polyline)
     private val linePane = Pane()                        // средний: кривые Безье
     private val labelPane = Pane()                       // слой для текстовых меток labelMode
     private val portPane = Pane()                        // слой для кружочков портов
@@ -103,12 +101,6 @@ class SchematicWindow : ProjectAware {
         linePane.isManaged = false
         linePane.isPickOnBounds = false
 
-        // Слой проводов из ELK
-        wirePane.prefWidth = 5000.0
-        wirePane.prefHeight = 5000.0
-        wirePane.isManaged = false
-        wirePane.isPickOnBounds = false
-
         // Слой кружочков
         portPane.prefWidth = 5000.0
         portPane.prefHeight = 5000.0
@@ -121,8 +113,8 @@ class SchematicWindow : ProjectAware {
         labelPane.isManaged = false
         labelPane.isPickOnBounds = false
 
-        // Основной Pane — 6 слоёв: сетка (canvas), провода ELK (wirePane), линии (linePane), метки (labelPane), порты, компоненты
-        mainPane.children.setAll(canvas, wirePane, linePane, labelPane, portPane, componentPane)
+        // Основной Pane — 5 слоёв: сетка (canvas), линии (linePane), метки (labelPane), порты, компоненты
+        mainPane.children.setAll(canvas, linePane, labelPane, portPane, componentPane)
         mainPane.prefWidth = 5000.0
         mainPane.prefHeight = 5000.0
 
@@ -162,7 +154,6 @@ class SchematicWindow : ProjectAware {
         bomRows.forEach { row -> bomRowsMap[row.bomnetId] = row }
         drawGridOnCanvas()
         drawComponents()
-        drawAllWires()
         drawAllPorts() // <-- Рисуем кружочки один раз
     }
 
@@ -428,45 +419,6 @@ class SchematicWindow : ProjectAware {
     }
 
     /**
-     * Рисует все провода из ELK (WireConnection с bendPoints) на wirePane.
-     */
-    private fun drawAllWires() {
-        wirePane.children.clear()
-
-        if (schematicWires.isEmpty()) return
-
-        schematicWires.forEach { wire ->
-            val netColor = netColor(wire.netName)
-            val startCoord = getPinCoordinates(wire.refDesFrom, wire.pinFrom)
-            val endCoord = getPinCoordinates(wire.refDesTo, wire.pinTo)
-
-            if (startCoord == null || endCoord == null) return@forEach
-
-            val coords = mutableListOf<Double>().apply {
-                add(startCoord.first)
-                add(startCoord.second)
-                wire.bendPoints.forEach { bp ->
-                    add(bp.x)
-                    add(bp.y)
-                }
-                add(endCoord.first)
-                add(endCoord.second)
-            }
-
-            if (coords.size >= 4) {
-                val polyline = javafx.scene.shape.Polyline().apply {
-                    this.points.setAll(coords)
-                    stroke = netColor
-                    fill = null
-                    strokeWidth = 2.0
-                    opacity = 0.7
-                }
-                wirePane.children.add(polyline)
-            }
-        }
-    }
-
-    /**
      * Получает координаты пина по refDes и pinNumber.
      */
     private fun getPinCoordinates(refDes: String, pinNumber: String): Pair<Double, Double>? {
@@ -591,7 +543,6 @@ class SchematicWindow : ProjectAware {
                     // Перерисовываем кружочки и линии
                     drawAllPorts()
                     drawPortConnections(activePorts.toSet())
-                    drawAllWires()
                 }
                 event.consume()
             }
@@ -602,7 +553,6 @@ class SchematicWindow : ProjectAware {
                 activePorts.removeAll(connectedPorts)
                 drawAllPorts()
                 drawPortConnections(activePorts.toSet())
-                drawAllWires()
                 dragNode = null
                 saveSchematicAsync()
                 event.consume()
@@ -637,7 +587,7 @@ class SchematicWindow : ProjectAware {
         val task = object : Task<Unit>() {
             override fun call() {
                 projectPaths?.let { paths ->
-                    val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList(), wires = schematicWires.toList())
+                    val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList())
                     SchematicRepository.save(paths, doc)
                 }
             }
@@ -670,8 +620,7 @@ class SchematicWindow : ProjectAware {
                 projectPaths?.let { paths ->
                     val doc = SchematicDocument(
                         schemaVersion = 1,
-                        nodes = schematicNodes.toList(),
-                        wires = schematicWires.toList()
+                        nodes = schematicNodes.toList()
                     )
                     SchematicRepository.save(paths, doc)
                 }
@@ -717,7 +666,6 @@ class SchematicWindow : ProjectAware {
 
                     javafx.application.Platform.runLater {
                         schematicNodes.setAll(nodes)
-                        schematicWires.clear()
                         drawSchematic()
                         statusLabel.text = I18n.tr("schematic.status.layout_done")?.replace("{0}", nodes.size.toString())
                             ?: "Раскладка завершена: ${nodes.size} компонентов"
@@ -827,7 +775,7 @@ class SchematicWindow : ProjectAware {
                 }
 
                 // Сохраняем
-                val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList(), wires = schematicWires.toList())
+                val doc = SchematicDocument(schemaVersion = 1, nodes = schematicNodes.toList())
                 SchematicRepository.save(paths, doc)
             }
 
@@ -891,14 +839,10 @@ class SchematicWindow : ProjectAware {
                 connectedNets.forEach { net ->
                     net.connections.forEach { conn ->
                         if (conn.refDes != newRow.refDes && conn.refDes.isNotBlank()) {
-                            // Найти bomnetId по refDes
+                            // Найти строку в newRows
                             val connectedRow = newRows.find { it.refDes == conn.refDes }
-                                ?: BomRepository.loadRows(ProjectPaths(newRows[0].let { r -> java.nio.file.Path.of(r.comment) }, "")).find { it.refDes == conn.refDes } // fallback
-                            // Проще: ищем в existingNodes по refDes через bomRowsMap
-                            // Но у нас нет доступа к BomRow -> bomnetId маппингу
-                            // Поэтому используем refDes напрямую
+                            // Ищем node по refDes через bomRowsMap
                             val existingNode = existingNodes.find { node ->
-                                // Ищем node по refDes из BomRow
                                 bomRowsMap.entries.find { it.value.refDes == conn.refDes }?.value?.bomnetId == node.bomnetId
                             }
                             if (existingNode != null) {
@@ -1016,11 +960,9 @@ class SchematicWindow : ProjectAware {
                     val nodes = generateGridCoordinates(rows)
                     SchematicRepository.save(paths, SchematicDocument(schemaVersion = 1, nodes = nodes))
                     schematicNodes.setAll(nodes)
-                    schematicWires.clear()
                     logger.info("Auto-layout completed: ${nodes.size} components")
                 } else {
                     schematicNodes.setAll(existingDoc.nodes)
-                    schematicWires.setAll(existingDoc.wires)
                 }
             }
 

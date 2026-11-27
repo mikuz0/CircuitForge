@@ -59,28 +59,6 @@ class SchematicExporter {
             svg.appendLine("  <text x=\"${node.x - 20}\" y=\"${node.y - 10}\" font-size=\"11\" fill=\"gray\">${row.comment}</text>")
         }
         svg.appendLine("</g>")
-
-        svg.appendLine("<g id=\"wires\" fill=\"none\" stroke=\"black\" stroke-width=\"1.5\">")
-        for (wire in document.wires) {
-            val net = nets.find { it.name == wire.netName } ?: continue
-            val color = netColorToHex(net.name)
-
-            // Вызов с 5 аргументами (совпадает с сигнатурой ниже)
-            val startCoord = getPinCoordinatesFromNode(document, wire.refDesFrom, wire.pinFrom, bomRows, componentsMap)
-            val endCoord = getPinCoordinatesFromNode(document, wire.refDesTo, wire.pinTo, bomRows, componentsMap)
-
-            if (startCoord != null && endCoord != null) {
-                val path = buildString {
-                    append("M ${startCoord.first} ${startCoord.second}")
-                    for (bp in wire.bendPoints) {
-                        append(" L ${bp.x} ${bp.y}")
-                    }
-                    append(" L ${endCoord.first} ${endCoord.second}")
-                }
-                svg.appendLine("  <path d=\"$path\" stroke=\"$color\"/>")
-            }
-        }
-        svg.appendLine("</g>")
         svg.appendLine("</svg>")
 
         val outputFile = outputDir.resolve("schematic.svg")

@@ -5,7 +5,6 @@ import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.*
-import javafx.scene.control.cell.TextFieldTableCell
 import javafx.scene.layout.*
 import javafx.stage.Stage
 import org.slf4j.LoggerFactory
@@ -30,7 +29,6 @@ class BomWindow : ProjectAware {
     private var projectPaths: ProjectPaths? = null
 
     private val bomRows = FXCollections.observableArrayList<BomRow>()
-    private var savedSnapshot: String = ""
 
     private val tableView = TableView<BomRow>()
     private val addButton = Button(I18n.tr("bom.btn.add") ?: "Добавить элемент")
@@ -391,7 +389,6 @@ class BomWindow : ProjectAware {
                         )
                     }
                     BomRepository.save(paths, BomDocument(schemaVersion = 1, items = items))
-                    savedSnapshot = serializeCurrentState()
                 }
             }
         }
@@ -410,13 +407,8 @@ class BomWindow : ProjectAware {
         projectPaths?.let { paths ->
             val rows = BomRepository.loadRows(paths)
             bomRows.setAll(rows)
-            savedSnapshot = serializeCurrentState()
             statusLabel.text = "Отменено"
         }
-    }
-
-    private fun serializeCurrentState(): String {
-        return bomRows.map { "${it.bomnetId}|${it.refDes}|${it.componentId}|${it.comment}" }.joinToString(";")
     }
 
     private fun markDirty() {
@@ -435,7 +427,6 @@ class BomWindow : ProjectAware {
 
             val rows = BomRepository.loadRows(paths)
             bomRows.setAll(rows)
-            savedSnapshot = serializeCurrentState()
             statusLabel.text = "Загружено: ${rows.size} элементов"
             logger.info("BOM opened: $projectPath, ${rows.size} items")
         } catch (e: Exception) {

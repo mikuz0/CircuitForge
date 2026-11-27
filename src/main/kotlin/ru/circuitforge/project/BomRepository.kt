@@ -88,39 +88,40 @@ object BomRepository {
 
     /**
      * Загружает строки BOM с подтягиванием имён компонентов по UUID.
+     * Использует кэш компонентов для O(N) вместо O(N×M).
      */
     fun loadRows(paths: ProjectPaths): List<BomRow> {
         val bomDoc = load(paths)
-        val rows = mutableListOf<BomRow>()
 
-        bomDoc.items.forEach { item ->
-            var compName = "<not found>"
-            var prefix = "?"
-            var slug = item.componentSlug
+        // Кэш: componentId -> Component (загружаем все компоненты один раз)
+        val componentCache = mutableMapOf<String, Component>()
+        val componentsDir = paths.componentsDir
+        if (Files.exists(componentsDir)) {
             try {
-                val comp = ComponentRepository.loadComponentById(paths.projectDir, item.componentId)
-                if (comp != null) {
-                    compName = comp.name
-                    prefix = comp.refPrefix
-                    if (slug.isBlank()) {
-                        val componentsDir = paths.componentsDir
-                        if (Files.exists(componentsDir)) {
-                            Files.list(componentsDir).use { stream ->
-                                stream.filter { it.fileName.toString().endsWith(".cfcomp") }
-                                    .forEach { path ->
-                                        try {
-                                            val loadedComp = ComponentRepository.load(path)
-                                            if (loadedComp.id == item.componentId) {
-                                                slug = path.fileName.toString().removeSuffix(".cfcomp")
-                                            }
-                                        } catch (e: Exception) { /* skip */ }
-                                    }
-                            }
+                Files.list(componentsDir).use { stream ->
+                    stream.filter { it.fileName.toString().endsWith(".cfcomp") }
+                        .forEach { path ->
+                            runCatching { ComponentRepository.load(path) }.getOrNull()
+                                ?.let { componentCache[it.id] = it }
                         }
-                    }
                 }
             } catch (e: Exception) {
-                logger.warn("Failed to load component by id: ${item.componentId}", e)
+                logger.warn("Failed to scan components dir for cache: $componentsDir", e)
+            }
+        }
+
+        val rows = mutableListOf<BomRow>()
+        bomDoc.items.forEach { item ->
+            val comp = componentCache[item.componentId]
+            val compName = comp?.name ?: "<not found>"
+            val prefix = comp?.refPrefix ?: "?"
+            val slug = item.componentSlug.ifBlank {
+                // Если slug пустой, пытаемся найти по componentId в кэше
+                comp?.let { component ->
+                    componentsDir.resolve("${ComponentRepository.generateSlug(component.name)}.cfcomp").let { 
+                        if (Files.exists(it)) ComponentRepository.generateSlug(component.name) else ""
+                    }
+                } ?: ""
             }
 
             rows.add(BomRow(
